@@ -115,7 +115,7 @@ public class SettingsService {
         if (!v.isEmpty()) d.validator().accept(v);
         db.update("delete from workspace_settings where workspace_id = ? and name = ?", ws, name);
         if (!v.isEmpty()) {
-            db.update("insert into workspace_settings(workspace_id, name, value, secret, updated_at) values (?,?,?,?,?)",
+            db.update("insert into workspace_settings(workspace_id, name, setting_value, secret, updated_at) values (?,?,?,?,?)",
                     ws, name, d.secret() ? crypto.encrypt(v) : v, d.secret(), Timestamp.from(Instant.now()));
         }
         cache.remove(ws);
@@ -124,7 +124,7 @@ public class SettingsService {
 
     public void setRaw(String ws, String name, String value) {
         db.update("delete from workspace_settings where workspace_id = ? and name = ?", ws, name);
-        db.update("insert into workspace_settings(workspace_id, name, value, secret, updated_at) values (?,?,?,?,?)",
+        db.update("insert into workspace_settings(workspace_id, name, setting_value, secret, updated_at) values (?,?,?,?,?)",
                 ws, name, value, false, Timestamp.from(Instant.now()));
         cache.remove(ws);
     }
@@ -164,7 +164,7 @@ public class SettingsService {
     private Map<String, String> load(String ws) {
         return cache.computeIfAbsent(ws, k -> {
             Map<String, String> m = new HashMap<>();
-            db.query("select name, value, secret from workspace_settings where workspace_id = ?", rs -> {
+            db.query("select name, setting_value, secret from workspace_settings where workspace_id = ?", rs -> {
                 String v = rs.getString(2);
                 m.put(rs.getString(1), rs.getBoolean(3) ? crypto.decrypt(v) : v);
             }, k);

@@ -20,7 +20,7 @@ public class AuditService {
     }
 
     public void log(String workspaceId, String actor, String action, String detail) {
-        db.update("insert into audit_events(workspace_id, actor, action, detail, at) values (?,?,?,?,?)",
+        db.update("insert into audit_events(workspace_id, actor, action, detail, event_at) values (?,?,?,?,?)",
                 workspaceId, JsonUtil.truncate(actor, 120), action, JsonUtil.truncate(detail, 1900), Timestamp.from(Instant.now()));
     }
 
@@ -29,7 +29,7 @@ public class AuditService {
     }
 
     public List<Map<String, Object>> list(String workspaceId, int limit) {
-        return db.queryForList("select actor, action, detail, at from audit_events where workspace_id = ? order by at desc limit ?",
+        return db.queryForList("select actor, action, detail, event_at as at from audit_events where workspace_id = ? order by event_at desc limit ?",
                 workspaceId, Math.min(limit, 500));
     }
 }

@@ -25,6 +25,7 @@ PULSEAGENT_INGEST_KEY=$INGEST
 APP_ADMIN_KEY_SHA256=$(sha "$ADMIN")
 APP_INGEST_KEY_SHA256=$(sha "$INGEST")
 APP_SESSION_SECRET=$SESSION
+APP_ENCRYPTION_KEY=$(rand 48)
 # Paste your free key from https://aistudio.google.com/apikey (leave empty for offline mode)
 GEMINI_API_KEY=$GEMINI_EXISTING
 EOF

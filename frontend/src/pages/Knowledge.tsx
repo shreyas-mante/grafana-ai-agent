@@ -72,7 +72,8 @@ export default function Knowledge() {
           <table className="table">
             <tbody>
               {docs.map((d) => (
-                <tr key={d.id}><td><span className="tag">{d.type}</span></td><td>{d.title}</td><td className="muted small">{d.source.startsWith('auto') ? 'auto-saved' : d.source}</td></tr>
+                <tr key={d.id}><td><span className="tag">{d.type}</span></td><td>{d.title}</td><td className="muted small">{d.source.startsWith('auto') ? 'auto-saved' : d.source}</td>
+                  <td><button className="small ghost" aria-label={'Delete ' + d.title} onClick={() => confirm('Delete "' + d.title + '"?') && api('/api/knowledge/' + d.id, 'DELETE').then(load)}>✕</button></td></tr>
               ))}
             </tbody>
           </table>

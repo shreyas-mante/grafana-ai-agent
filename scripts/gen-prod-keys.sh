@@ -21,7 +21,8 @@ cat > .env.production <<EOF
 # Plain keys: you sign in with ADMIN; apps and webhooks use INGEST.
 PROD_ADMIN_KEY=$ADMIN
 PROD_INGEST_KEY=$INGEST
-# Paste these two hashes into Render's environment settings:
+# Paste these into Render's environment settings (the encryption key protects saved integration secrets):
+APP_ENCRYPTION_KEY=$(rand 48)
 APP_ADMIN_KEY_SHA256=$(sha "$ADMIN")
 APP_INGEST_KEY_SHA256=$(sha "$INGEST")
 EOF

@@ -49,7 +49,7 @@ public class ErrorStore {
         String sha = e.commitSha() == null || e.commitSha().isBlank() ? existing.map(ErrorGroup::commitSha).orElse(null) : e.commitSha();
         data.put("commitSha", sha);
         if (existing.isPresent()) {
-            db.update("update error_groups set count = count + 1, last_seen = ?, data = ? where workspace_id = ? and id = ?",
+            db.update("update error_groups set occurrences = occurrences + 1, last_seen = ?, data = ? where workspace_id = ? and id = ?",
                     now, JsonUtil.write(data), ws, id);
         } else {
             Integer n = db.queryForObject("select count(*) from error_groups where workspace_id = ?", Integer.class, ws);
@@ -57,25 +57,25 @@ public class ErrorStore {
                 db.update("delete from error_groups where workspace_id = ? and id = (select id from error_groups where workspace_id = ? order by last_seen limit 1)", ws, ws);
             }
             try {
-                db.update("insert into error_groups(workspace_id, id, service, count, first_seen, last_seen, data) values (?,?,?,?,?,?,?)",
+                db.update("insert into error_groups(workspace_id, id, service, occurrences, first_seen, last_seen, data) values (?,?,?,?,?,?,?)",
                         ws, id, e.service(), 1, now, now, JsonUtil.write(data));
             } catch (DuplicateKeyException race) {
-                db.update("update error_groups set count = count + 1, last_seen = ? where workspace_id = ? and id = ?", now, ws, id);
+                db.update("update error_groups set occurrences = occurrences + 1, last_seen = ? where workspace_id = ? and id = ?", now, ws, id);
             }
         }
         return get(ws, id).orElseThrow();
     }
 
     public Optional<ErrorGroup> get(String ws, String id) {
-        List<ErrorGroup> r = db.query("select id, service, count, first_seen, last_seen, data from error_groups where workspace_id = ? and id = ?", this::map, ws, id);
+        List<ErrorGroup> r = db.query("select id, service, occurrences, first_seen, last_seen, data from error_groups where workspace_id = ? and id = ?", this::map, ws, id);
         return r.isEmpty() ? Optional.empty() : Optional.of(r.get(0));
     }
 
     public List<ErrorGroup> recent(String ws, String service, int limit) {
         if (service == null || service.isBlank()) {
-            return db.query("select id, service, count, first_seen, last_seen, data from error_groups where workspace_id = ? order by last_seen desc limit ?", this::map, ws, limit);
+            return db.query("select id, service, occurrences, first_seen, last_seen, data from error_groups where workspace_id = ? order by last_seen desc limit ?", this::map, ws, limit);
         }
-        return db.query("select id, service, count, first_seen, last_seen, data from error_groups where workspace_id = ? and lower(service) = lower(?) order by last_seen desc limit ?",
+        return db.query("select id, service, occurrences, first_seen, last_seen, data from error_groups where workspace_id = ? and lower(service) = lower(?) order by last_seen desc limit ?",
                 this::map, ws, service, limit);
     }
 

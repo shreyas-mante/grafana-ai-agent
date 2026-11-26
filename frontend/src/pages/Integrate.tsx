@@ -16,7 +16,7 @@ export default function Integrate() {
   return (
     <div className="page">
       <h1>Integrate</h1>
-      <p className="muted">Three ways to connect your applications. Use the <strong>ingest key</strong> for apps and webhooks (it can only send errors and alerts), and keep the admin key for people.</p>
+      <p className="muted">Four ways to connect your applications. Create keys in Settings → API keys. Use the <strong>ingest key</strong> for apps and webhooks (it can only send errors and alerts), and keep the admin key for people.</p>
 
       <Snippet title="1. Report exceptions from a Spring Boot app" code={`<dependency>
   <groupId>com.pulseagent</groupId>
@@ -42,7 +42,14 @@ pulseagent:
 # → 202 {"id":"inv_…","status":"QUEUED","statusUrl":"/api/v1/investigations/inv_…"}
 curl ${origin}/api/v1/investigations/inv_… -H "X-API-Key: $PULSEAGENT_ADMIN_KEY"`} />
 
-      <Snippet title="3. Auto-investigate Grafana alerts (webhook)" code={`Grafana → Alerting → Contact points → New → Webhook
+      <Snippet title="3. Embed the chat widget in your internal tools" code={`<script src="${origin}/widget.js"
+        data-key="pa_widget_…"
+        data-service="payment-service"
+        async></script>`}>
+        <p className="muted small">Create a <strong>widget</strong> key in Settings → API keys and list the sites allowed to use it. Widget keys can only ask questions and read short answers.</p>
+      </Snippet>
+
+      <Snippet title="4. Auto-investigate Grafana alerts (webhook)" code={`Grafana → Alerting → Contact points → New → Webhook
 URL:                 ${origin}/api/v1/webhooks/grafana
 HTTP method:         POST
 Authorization header: Bearer <your ingest key>`}>

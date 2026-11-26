@@ -1,5 +1,7 @@
 # Render Blueprint (free plan). Render → New → Blueprint → pick this repo.
 # Secrets marked "sync: false" are entered in the Render dashboard and never stored in git.
+# Integrations (AI, Prometheus, Loki, Tempo, Grafana, GitHub, Slack) are configured per
+# workspace in the app's Settings page, encrypted at rest.
 services:
   - type: web
     name: pulseagent
@@ -9,27 +11,23 @@ services:
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
+      # Free Neon Postgres: the postgres://... connection string. Required (Render's disk is temporary).
+      - key: DATABASE_URL
+        sync: false
+      # Your Render URL, e.g. https://pulseagent.onrender.com (used in links and invites)
+      - key: APP_PUBLIC_URL
+        sync: false
+      - key: APP_SESSION_SECRET
+        generateValue: true
+      - key: APP_ENCRYPTION_KEY
+        generateValue: true
+      # invite (default) = only people you invite can join; open = anyone can create a workspace
+      - key: APP_SIGNUP
+        value: invite
+      - key: APP_SECURE_COOKIES
+        value: "true"
+      # Optional bootstrap: an admin/ingest key pair for a default workspace (hashes from scripts/gen-prod-keys.sh)
       - key: APP_ADMIN_KEY_SHA256
         sync: false
       - key: APP_INGEST_KEY_SHA256
         sync: false
-      - key: APP_SESSION_SECRET
-        generateValue: true
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: APP_LLM_MODEL
-        value: gemini-2.5-flash
-      - key: APP_PROMETHEUS_URL
-        sync: false
-      - key: APP_PROMETHEUS_USERNAME
-        sync: false
-      - key: APP_PROMETHEUS_TOKEN
-        sync: false
-      - key: APP_GITHUB_REPO
-        sync: false
-      - key: GITHUB_TOKEN
-        sync: false
-      - key: APP_CODE_PACKAGES
-        value: com.demo
-      - key: APP_SECURE_COOKIES
-        value: "true"

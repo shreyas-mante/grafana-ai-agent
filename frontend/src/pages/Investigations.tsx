@@ -89,9 +89,9 @@ export default function Investigations() {
                 <tr key={i.id} className="clickable" onClick={() => go('/inv/' + i.id)}>
                   <td><div className="strong">{i.title || i.question}</div>{i.title && <div className="muted small">{i.question}</div>}</td>
                   <td>{i.service || '—'}</td>
-                  <td><span className="tag">{i.trigger}</span></td>
+                  <td><span className="tag">{i.trigger_type}</span></td>
                   <td><StatusBadge status={i.status} confidence={i.confidence} /></td>
-                  <td className="muted">{ago(i.createdAt)}</td>
+                  <td className="muted">{ago(i.created_at)}</td>
                 </tr>
               ))}
             </tbody>

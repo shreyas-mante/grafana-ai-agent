@@ -47,7 +47,7 @@ create table invites (
 create table workspace_settings (
     workspace_id varchar(40) not null references workspaces(id) on delete cascade,
     name varchar(60) not null,
-    value text,
+    setting_value text,
     secret boolean not null,
     updated_at timestamp not null,
     primary key (workspace_id, name)
@@ -76,7 +76,7 @@ create table error_groups (
     workspace_id varchar(40) not null references workspaces(id) on delete cascade,
     id varchar(40) not null,
     service varchar(100) not null,
-    count bigint not null,
+    occurrences bigint not null,
     first_seen timestamp not null,
     last_seen timestamp not null,
     data text not null,
@@ -131,6 +131,6 @@ create table audit_events (
     actor varchar(120) not null,
     action varchar(60) not null,
     detail varchar(2000),
-    at timestamp not null
+    event_at timestamp not null
 );
-create index audit_ws on audit_events(workspace_id, at);
+create index audit_ws on audit_events(workspace_id, event_at);

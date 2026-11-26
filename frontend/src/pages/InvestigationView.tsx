@@ -149,7 +149,7 @@ export default function InvestigationView({ id }: { id: string }) {
         <StatusBadge status={inv.status} confidence={r.confidence} />
       </div>
       <div className="muted small meta-line">
-        {inv.service && <>{inv.service} · </>}last {inv.lookbackMinutes} min · {inv.stepCount} tool calls · {inv.mode === 'offline' ? 'offline mode' : 'AI mode'} · started {ago(inv.createdAt)}
+        {inv.service && <>{inv.service} · </>}last {inv.lookbackMinutes} min · {inv.stepCount} tool calls · {inv.mode === 'offline' ? 'offline mode' : inv.model || 'AI mode'} · started {ago(inv.createdAt)}
         {inv.durationSeconds != null && <> · took {Math.round(inv.durationSeconds)}s</>}
       </div>
       {r.title && <div className="question">“{inv.question}”</div>}
@@ -236,6 +236,14 @@ export default function InvestigationView({ id }: { id: string }) {
               <p>{r.suggestedFix.explanation}</p>
               {r.suggestedFix.diff && <Diff text={r.suggestedFix.diff} />}
               <p className="hint">{inv.mode === 'offline' ? 'From your knowledge base.' : 'Suggested by AI from the evidence above.'} Review before applying.</p>
+            </div>
+          )}
+
+          {inv.actions?.length > 0 && (
+            <div className="card">
+              <h3>Proposed actions</h3>
+              <p className="muted small">The agent proposed {inv.actions.length === 1 ? 'an action' : inv.actions.length + ' actions'}. Nothing runs until an owner approves it.</p>
+              <a href="#/actions">Review in Actions →</a>
             </div>
           )}
 

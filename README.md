@@ -1,22 +1,23 @@
 # PulseAgent: AI incident investigator for Prometheus, your code, and your runbooks
 
-When an API fails, PulseAgent finds out **why**:
+When an API fails, PulseAgent finds out **why**, and it's built as a multi-team product:
 
-- **Metrics:** queries Prometheus for traffic, errors, p95 latency and saturation, and compares the incident window with the baseline.
-- **Code:** maps the stack trace to the **exact file and line at the deployed commit**, with **git blame** (author, commit, PR) and the newest change near the failure.
-- **Knowledge (RAG):** searches your runbooks and past incidents, and saves every finished investigation as a new incident.
-- **Fix:** proposes a grounded fix and lets you ask follow-up questions in chat.
+- **Evidence from everywhere:** Prometheus metrics, Loki logs, Tempo traces, Grafana dashboards, your service map, and app exceptions from the SDK.
+- **Code:** the stack trace mapped to the **exact file and line at the deployed commit**, with git blame (author, commit, PR) and the newest change near the failure.
+- **Knowledge (RAG):** your runbooks and past incidents; every finished investigation is saved as a new incident.
+- **Fix and act:** a grounded fix suggestion, follow-up chat, and **remediations that run only after an owner approves them** (signed webhook or GitHub issue).
+- **Ways in:** web UI, REST API, Grafana alert webhook, **embeddable chat widget**, **scheduled checks**, and **Slack** notifications.
+- **Platform:** workspaces, accounts and invites, roles, hashed API keys, encrypted per-workspace settings, an audit log, and a durable job queue on Postgres.
+- **Bring your own AI:** Gemini or Groq (free tiers), **Claude** (official Anthropic SDK, default `claude-opus-5-5`), OpenAI, or local Ollama. With no key it runs a free offline mode.
 
-Ask a question in the UI, call the REST API, or send Grafana alerts to the webhook to start investigations automatically.
-
-**Stack:** Java 21 and Spring Boot 3 backend; React and TypeScript UI (bundled into the jar); Gemini API (free tier) with an offline fallback; Spring Boot starter SDK for error reporting.
+**Stack:** Java 21 and Spring Boot 3, PostgreSQL (Neon) or embedded H2, Flyway; React and TypeScript UI bundled into the jar.
 
 ```
-backend/     Spring Boot API, agent loop, tools, RAG, security
-frontend/    React UI (builds into backend/src/main/resources/static)
+backend/     Spring Boot API, agent loop, tools, RAG, tenancy, security
+frontend/    React UI and public/widget.js (built into backend/src/main/resources/static)
 sdk/         pulseagent-spring-boot-starter: reports exceptions + commit SHA
 demo-app/    Payment service with an intentional bug, for the demo
-knowledge/   Seed runbooks and past incidents
+knowledge/   Starter runbooks and incidents (copied into each new workspace)
 prometheus/  Local Prometheus config and alert rules
 ```
 
@@ -29,7 +30,7 @@ scripts/gen-keys.sh        # creates .env.local with your keys (chmod 600)
 scripts/dev.sh             # builds and starts Prometheus, PulseAgent and the demo service
 ```
 
-Open http://127.0.0.1:8080 and sign in with `PULSEAGENT_ADMIN_KEY` from `.env.local`.
+Open http://127.0.0.1:8080, choose **API key**, and sign in with `PULSEAGENT_ADMIN_KEY` from `.env.local`. Then use **Settings** to connect integrations and invite people.
 
 **Break the demo and watch it find the bug:**
 ```bash
@@ -37,7 +38,7 @@ scripts/chaos.sh on        # the payment gateway gets slow, and the pool exhaust
 ```
 Wait about 30 seconds, then go to **Errors**, choose **Investigate**, and it points to `PaymentService.java` and commit *"run gateway authorization inside the pooled unit of work"*.
 
-**Turn on AI mode (free):** get a key at https://aistudio.google.com/apikey, put it in `.env.local` as `GEMINI_API_KEY=...`, and run `scripts/dev.sh` again. Without a key, PulseAgent runs a deterministic offline investigation.
+**Turn on AI mode (free):** in **Settings**, then **Integrations**, then **AI provider**, choose `gemini` and paste a key from https://aistudio.google.com/apikey, then choose **Test connection**. Or choose `anthropic` for Claude. Without a key, PulseAgent runs a deterministic offline investigation.
 
 Stop everything with `scripts/stop.sh`.
 

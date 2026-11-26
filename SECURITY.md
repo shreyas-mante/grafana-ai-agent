@@ -1,45 +1,47 @@
 # Security model
 
-PulseAgent reads production telemetry and source code, so it is built to fail closed.
+PulseAgent reads production telemetry and source code for many teams, so it is built to fail closed.
+
+## Tenancy
+- Every request resolves to an **Actor** (workspace, identity, role) from verified credentials only. Every database query is scoped to that workspace; IDs from the URL or body never choose the workspace.
+- Roles: **owner** (settings, keys, members, approvals), **member** (investigate, knowledge, schedules), **ingest** key (send errors and alerts only), **widget** key (ask questions from allowed sites only).
+- Roles are re-checked against the database on every request, so removing someone takes effect immediately.
+- Tests cover cross-workspace isolation, role checks, one-time invites and key revocation.
 
 ## Secrets
-- All secrets come from environment variables (or the host's secret store). None are in git, and `.gitignore` and CI (gitleaks) guard against commits.
-- API keys are never stored: the server keeps only their **SHA-256 hashes** and compares in constant time.
-- Missing key configuration disables that key type instead of opening access.
-- The Gemini key, GitHub token and Prometheus token are sent only in request headers, never in URLs, logs, prompts or API responses. `/api/meta` reports only whether integrations are configured.
-- `scripts/gen-keys.sh` writes local keys to `.env.local` with `600` permissions and doesn't print them.
+- Passwords: bcrypt (cost 12), at least 12 characters. Login timing is equalised so it doesn't reveal which emails exist.
+- API keys: 256-bit random. Only **SHA-256 hashes** are stored; the plain key is shown once.
+- Integration secrets (AI keys, tokens, webhooks): **AES-256-GCM** encrypted at rest with `APP_ENCRYPTION_KEY`. They are never returned by the API (the UI only sees "set"), never put in prompts, and never logged.
+- Server secrets come only from environment variables. `.gitignore` and CI (gitleaks) keep them out of git.
 
-## Authentication and authorization
-| Credential | Can do |
-|---|---|
-| Admin key | Everything: UI login, investigations, knowledge base, REST API |
-| Ingest key | Only `POST /api/v1/errors` and `POST /api/v1/webhooks/grafana` |
+## Sessions and browser
+- The web UI uses an **HttpOnly, Secure, SameSite=Strict** cookie with an HMAC-signed, 8-hour session, revoked on logout. JavaScript never holds a key or token.
+- Cookie-authenticated writes also need a custom header (CSRF defence in depth).
+- Strict CSP (`script-src 'self'`, `frame-ancestors 'none'`), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, HSTS, Permissions-Policy, COOP and CORP (cross-origin only for `/widget.js` and the widget API).
+- The widget runs in a closed Shadow DOM, renders server text with `textContent` only, and never sends cookies. CORS is allowed only on `/api/widget/**`, and each widget key works only from its allowlisted origins.
 
-- The web UI exchanges the admin key for an **HttpOnly, Secure, SameSite=Strict** cookie holding an HMAC-SHA256 signed session (8 h, revoked on logout). JavaScript never holds a key or token.
-- Cookie-authenticated writes also require a custom `X-Requested-With` header (CSRF defense in depth).
-- Login is rate-limited (10/min per IP) and slowed on failure.
+## Outbound requests (SSRF)
+Every URL a workspace configures must use **https**, may not contain credentials or a query string, and may not resolve to loopback, private, link-local (including cloud metadata `169.254.169.254`), CGNAT, multicast or unspecified addresses. This is checked when settings are saved and again before every request; redirects are never followed. Slack webhooks must be on `hooks.slack.com`. Local-network targets are allowed only when the operator sets `APP_ALLOW_PRIVATE_TARGETS=true` (local development).
 
-## Hardening
-- Strict Content-Security-Policy (`script-src 'self'`, `frame-ancestors 'none'`), `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, HSTS, Permissions-Policy, COOP and CORP.
-- Per-IP rate limits for the API, AI endpoints (cost control) and ingest; request bodies are capped at 256 KB, including chunked uploads.
-- All inputs are validated with bounded sizes and allow-list patterns. Errors return short generic messages, with no stack traces or internals.
-- Only `/actuator/health` is exposed.
-- The Docker image runs as a non-root user and contains only the compiled jar, with no source or build tools.
+## Abuse and cost controls
+- Per-IP rate limits for login/sign-up, AI endpoints, ingest and the general API. Request bodies are capped at 256 KB, chunked requests included.
+- Per-workspace caps: investigations per hour, scheduled checks, error groups. Old investigations are pruned after 30 days.
+- Sign-up is invite-only by default. Each workspace brings its own AI key; only the operator's bootstrap workspace can use the server's environment key.
 
 ## AI safety
-- The model can only *request* tools from a fixed allow-list. The backend validates every argument, enforces time-range, step and series limits, and runs everything **read-only**.
-- Tool output, logs, stack traces, code and documents are treated as untrusted data, and the system prompt tells the model to ignore instructions inside them (prompt-injection defense).
-- Secrets and personal data (tokens, keys, JWTs, private keys, card-like numbers, emails) are **redacted** before anything is stored or sent to the model.
-- Facts like file, line, author, commit and PR are shown from tool results directly, not from the model's wording.
-- Step, time and tool-output budgets bound every investigation.
+- The model can only *request* tools from an allowlist that depends on what the workspace configured. The backend validates every argument and enforces time-range, step, series, log-line and trace limits.
+- All investigation tools are **read-only**. The only write path is `propose_remediation`, which only creates a pending proposal. Nothing runs until an **owner approves** it, and execution is a separate, audited path (HMAC-signed webhook or GitHub issue).
+- Tool output, logs, stack traces, code and documents are treated as untrusted data (prompt-injection defence in the system prompt). Secrets and personal data are redacted before storage or model use.
+- Facts like file, line, author, commit and PR are shown from tool results, not from the model's wording.
+
+## Durability
+Investigations are stored after every step in PostgreSQL (or H2 locally) and run from a database-backed queue; jobs interrupted by a crash are retried up to 3 times.
 
 ## "Can someone reverse engineer it?"
-- All logic, prompts and integrations run on the server. Users only receive the compiled, minified UI bundle, with **no source maps** and console calls stripped. Browser code can never be fully hidden, so it contains nothing secret.
-- The backend jar is never distributed. Keep the GitHub repository **private**.
+All logic, prompts and integrations run on the server. Users only receive a minified UI bundle with **no source maps** and nothing secret in it. Keep the repository **private**, and the jar and container are never distributed.
 
 ## Data and privacy
-- With the free Gemini tier, Google may use prompts to improve its products. Don't send other companies' proprietary code through the free tier; use a paid key, or leave the key empty for offline mode.
-- Investigations and error groups are kept in memory, bounded (200 and 500). Knowledge documents persist in `APP_DATA_DIR`.
+Free AI tiers may use prompts to improve their products. For other companies' proprietary code, use a paid key (Gemini paid, Claude, or OpenAI), or no AI key (offline mode).
 
 ## Reporting
-Please report vulnerabilities privately to the repository owner rather than in a public issue.
+Please report vulnerabilities privately to the repository owner, not in a public issue.
