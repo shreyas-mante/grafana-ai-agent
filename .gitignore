@@ -1,0 +1,22 @@
+# Secrets: never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Runtime data
+.data/
+
+# Build output
+target/
+node_modules/
+frontend/dist/
+backend/src/main/resources/static/
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+*.iml
+*.log

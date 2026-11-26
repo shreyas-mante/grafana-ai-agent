@@ -1,0 +1,31 @@
+server:
+  port: 8081
+  # Demo only: never expose the chaos endpoint beyond this machine.
+  address: 127.0.0.1
+
+spring:
+  application:
+    name: payment-service
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,prometheus
+  metrics:
+    tags:
+      application: payment-service
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+pulseagent:
+  enabled: ${PULSEAGENT_ENABLED:true}
+  endpoint: ${PULSEAGENT_ENDPOINT:http://localhost:8080}
+  ingest-key: ${PULSEAGENT_INGEST_KEY:}
+  service: payment-service
+  environment: demo
+  commit-sha: ${PULSEAGENT_COMMIT_SHA:}
+
+demo:
+  load-rps: 20

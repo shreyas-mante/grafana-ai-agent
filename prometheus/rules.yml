@@ -1,0 +1,21 @@
+groups:
+  - name: payment-service
+    rules:
+      - alert: HighPaymentErrorRate
+        expr: |
+          100 * sum(rate(http_server_requests_seconds_count{job="payment-service",status=~"5.."}[1m]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count{job="payment-service"}[1m])), 1e-9) > 5
+        for: 30s
+        labels:
+          severity: critical
+          service: payment-service
+        annotations:
+          summary: Payment API 5xx error rate is above 5%
+      - alert: PaymentPoolSaturated
+        expr: max(demo_db_pool_active{job="payment-service"}) / max(demo_db_pool_max{job="payment-service"}) > 0.9
+        for: 30s
+        labels:
+          severity: warning
+          service: payment-service
+        annotations:
+          summary: Payment DB connection pool is over 90% used

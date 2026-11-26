@@ -1,0 +1,83 @@
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: framework
+  max-http-request-header-size: 16KB
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+    whitelabel:
+      enabled: false
+  tomcat:
+    max-swallow-size: 1MB
+    max-http-form-post-size: 64KB
+  servlet:
+    session:
+      tracking-modes: cookie
+
+spring:
+  application:
+    name: pulseagent
+  main:
+    banner-mode: off
+  threads:
+    virtual:
+      enabled: true
+  servlet:
+    multipart:
+      enabled: false
+  jackson:
+    default-property-inclusion: non_null
+  mvc:
+    problemdetails:
+      enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+logging:
+  level:
+    root: INFO
+    org.springframework.security: WARN
+
+app:
+  security:
+    # Only SHA-256 hashes of keys are configured, never the keys themselves.
+    admin-key-sha256: ${APP_ADMIN_KEY_SHA256:}
+    ingest-key-sha256: ${APP_INGEST_KEY_SHA256:}
+    session-secret: ${APP_SESSION_SECRET:}
+    secure-cookies: ${APP_SECURE_COOKIES:true}
+    session-hours: 8
+  llm:
+    api-key: ${GEMINI_API_KEY:}
+    model: ${APP_LLM_MODEL:gemini-2.5-flash}
+    embedding-model: ${APP_EMBEDDING_MODEL:gemini-embedding-001}
+    base-url: ${APP_LLM_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
+    max-steps: 10
+    timeout-seconds: 120
+  prometheus:
+    url: ${APP_PROMETHEUS_URL:http://localhost:9090}
+    bearer-token: ${APP_PROMETHEUS_TOKEN:}
+  code:
+    local-repo-path: ${APP_CODE_REPO_PATH:}
+    github-repo: ${APP_GITHUB_REPO:}
+    github-token: ${GITHUB_TOKEN:}
+    github-api-url: https://api.github.com
+    app-packages: ${APP_CODE_PACKAGES:com.demo}
+  knowledge:
+    dir: ${APP_KNOWLEDGE_DIR:../knowledge}
+    data-dir: ${APP_DATA_DIR:./.data}
+  limits:
+    max-range-minutes: 1440
+    min-step-seconds: 5
+    max-series: 10
+    max-body-bytes: 262144
+    requests-per-minute: 240
+    login-per-minute: 10
+    ai-per-minute: 15
