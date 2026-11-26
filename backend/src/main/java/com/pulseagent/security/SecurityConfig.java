@@ -1,6 +1,8 @@
 package com.pulseagent.security;
 
 import com.pulseagent.config.AppProperties;
+import com.pulseagent.tenant.ApiKeyService;
+import com.pulseagent.tenant.UserService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -28,9 +30,10 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http, ApiKeyService keys, SessionTokenService sessions,
-                                    AppProperties props) throws Exception {
-        AuthFilter authFilter = new AuthFilter(keys, sessions);
+                                    UserService users, AppProperties props) throws Exception {
+        AuthFilter authFilter = new AuthFilter(keys, sessions, users);
         RateLimitFilter rateLimitFilter = new RateLimitFilter(props);
+        WidgetCorsFilter widgetCors = new WidgetCorsFilter();
 
         http
             // Stateless API: CSRF is handled by SameSite=Strict cookies plus a required custom header.
@@ -48,11 +51,17 @@ public class SecurityConfig {
                 .httpStrictTransportSecurity(t -> t.includeSubDomains(true).maxAgeInSeconds(31_536_000))
                 .addHeaderWriter(new StaticHeadersWriter("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()"))
                 .addHeaderWriter(new StaticHeadersWriter("Cross-Origin-Opener-Policy", "same-origin"))
-                .addHeaderWriter(new StaticHeadersWriter("Cross-Origin-Resource-Policy", "same-origin")))
+                // The widget script and widget API are loaded by other sites; everything else is same-origin only.
+                .addHeaderWriter((req, res) -> res.setHeader("Cross-Origin-Resource-Policy",
+                        req.getRequestURI().equals("/widget.js") || req.getRequestURI().startsWith("/api/widget/") ? "cross-origin" : "same-origin")))
             .authorizeHttpRequests(a -> a
-                .requestMatchers("/api/auth/login", "/api/auth/logout", "/api/health", "/actuator/health").permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/v1/errors", "/api/v1/webhooks/grafana").hasAnyRole("INGEST", "ADMIN")
-                .requestMatchers("/api/**", "/actuator/**").hasRole("ADMIN")
+                .requestMatchers("/api/auth/login", "/api/auth/signup", "/api/auth/logout", "/api/auth/config",
+                        "/api/health", "/actuator/health").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/errors", "/api/v1/webhooks/grafana").hasAnyRole("INGEST", "MEMBER")
+                .requestMatchers("/api/widget/**").hasRole("WIDGET")
+                .requestMatchers("/api/admin/**").hasRole("OWNER")
+                .requestMatchers(HttpMethod.POST, "/api/actions/*/approve", "/api/actions/*/reject").hasRole("OWNER")
+                .requestMatchers("/api/**", "/actuator/**").hasRole("MEMBER")
                 .anyRequest().permitAll())
             .exceptionHandling(e -> e
                 .authenticationEntryPoint((req, res, ex) -> {
@@ -65,7 +74,8 @@ public class SecurityConfig {
                     res.setContentType("application/json");
                     res.getWriter().write("{\"error\":\"forbidden\"}");
                 }))
-            .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(widgetCors, UsernamePasswordAuthenticationFilter.class)
+            .addFilterAfter(rateLimitFilter, WidgetCorsFilter.class)
             .addFilterAfter(authFilter, RateLimitFilter.class);
         return http.build();
     }

@@ -31,9 +31,17 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler({ConstraintViolationException.class, HttpMessageNotReadableException.class,
-            MissingServletRequestParameterException.class, IllegalArgumentException.class})
+            MissingServletRequestParameterException.class})
     ResponseEntity<?> badRequest(Exception e) {
         return ResponseEntity.badRequest().body(Map.of("error", "Invalid request"));
+    }
+
+    /** Our own validation messages are user-facing; anything that looks internal is replaced. */
+    @ExceptionHandler(IllegalArgumentException.class)
+    ResponseEntity<?> invalid(IllegalArgumentException e) {
+        String m = e.getMessage();
+        boolean safe = m != null && m.length() <= 200 && !m.contains("\n") && !m.contains("Exception") && !m.contains("java.");
+        return ResponseEntity.badRequest().body(Map.of("error", safe ? m : "Invalid request"));
     }
 
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

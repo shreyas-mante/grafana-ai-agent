@@ -1,10 +1,9 @@
 package com.pulseagent.api;
 
-import com.pulseagent.code.CodeIntelService;
-import com.pulseagent.llm.EmbeddingService;
-import com.pulseagent.llm.GeminiClient;
 import com.pulseagent.rag.KnowledgeBase;
-import com.pulseagent.tools.PrometheusClient;
+import com.pulseagent.tenant.Actor;
+import com.pulseagent.tenant.EnvFactory;
+import com.pulseagent.tenant.WorkspaceEnv;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -14,18 +13,12 @@ import java.util.Map;
 @RestController
 public class MetaController {
 
-    private final GeminiClient llm;
-    private final EmbeddingService embeddings;
-    private final CodeIntelService code;
+    private final EnvFactory envs;
     private final KnowledgeBase kb;
-    private final PrometheusClient prom;
 
-    public MetaController(GeminiClient llm, EmbeddingService embeddings, CodeIntelService code, KnowledgeBase kb, PrometheusClient prom) {
-        this.llm = llm;
-        this.embeddings = embeddings;
-        this.code = code;
+    public MetaController(EnvFactory envs, KnowledgeBase kb) {
+        this.envs = envs;
         this.kb = kb;
-        this.prom = prom;
     }
 
     @GetMapping("/api/health")
@@ -33,16 +26,23 @@ public class MetaController {
         return Map.of("status", "ok");
     }
 
-    /** Integration status for the admin UI. Reports whether secrets are set, never their values. */
+    /** Integration status for the UI. Reports what is connected, never secret values. */
     @GetMapping("/api/meta")
     public Map<String, Object> meta() {
+        WorkspaceEnv env = envs.forWorkspace(Actor.current().workspaceId());
         Map<String, Object> m = new LinkedHashMap<>();
-        m.put("aiMode", llm.available() ? "ai" : "offline");
-        m.put("model", llm.available() ? llm.model() : null);
-        m.put("embeddings", embeddings.mode());
-        m.put("codeProvider", code.providerName());
-        m.put("prometheusHost", prom.host());
-        m.put("knowledgeDocs", kb.size());
+        m.put("aiMode", env.llm().isPresent() ? "ai" : "offline");
+        m.put("model", env.llm().map(p -> p.name() + " · " + p.model()).orElse(null));
+        m.put("embeddings", kb.mode(env.workspaceId()));
+        m.put("codeProvider", env.codeProviderName());
+        m.put("prometheusHost", env.prometheus().map(p -> p.host()).orElse(null));
+        m.put("loki", env.loki().isPresent());
+        m.put("tempo", env.tempo().isPresent());
+        m.put("grafana", env.grafana().isPresent());
+        m.put("serviceMap", env.hasTopology());
+        m.put("actions", env.actionsEnabled());
+        m.put("knowledgeDocs", kb.size(env.workspaceId()));
+        m.put("problems", env.problems());
         return m;
     }
 }

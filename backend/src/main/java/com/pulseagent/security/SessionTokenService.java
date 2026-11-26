@@ -14,6 +14,7 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -48,16 +49,17 @@ public class SessionTokenService {
 
     public long ttlSeconds() { return ttlSeconds; }
 
-    public String issue(String subject) {
-        long exp = Instant.now().getEpochSecond() + ttlSeconds;
-        String payload = JsonUtil.write(Map.of("sub", subject, "exp", exp, "jti", UUID.randomUUID().toString()));
-        String p = ENC.encodeToString(payload.getBytes(StandardCharsets.UTF_8));
+    public String issue(Map<String, String> claims) {
+        Map<String, Object> payload = new HashMap<>(claims);
+        payload.put("exp", Instant.now().getEpochSecond() + ttlSeconds);
+        payload.put("jti", UUID.randomUUID().toString());
+        String p = ENC.encodeToString(JsonUtil.write(payload).getBytes(StandardCharsets.UTF_8));
         return p + "." + ENC.encodeToString(hmac(p));
     }
 
-    /** Returns the subject if the token is authentic, unexpired and not revoked. */
-    public String verify(String token) {
-        if (token == null || token.length() > 1024) return null;
+    /** Returns the claims if the token is authentic, unexpired and not revoked; otherwise null. */
+    public Map<String, String> verify(String token) {
+        if (token == null || token.length() > 2048) return null;
         int dot = token.indexOf('.');
         if (dot <= 0) return null;
         String p = token.substring(0, dot);
@@ -70,23 +72,20 @@ public class SessionTokenService {
         if (!MessageDigest.isEqual(sig, hmac(p))) return null;
         try {
             JsonNode n = JsonUtil.M.readTree(DEC.decode(p));
-            long exp = n.path("exp").asLong(0);
-            if (Instant.now().getEpochSecond() >= exp) return null;
+            if (Instant.now().getEpochSecond() >= n.path("exp").asLong(0)) return null;
             if (revoked.containsKey(n.path("jti").asText())) return null;
-            return n.path("sub").asText(null);
+            Map<String, String> out = new HashMap<>();
+            n.fields().forEachRemaining(e -> out.put(e.getKey(), e.getValue().asText()));
+            return out;
         } catch (Exception e) {
             return null;
         }
     }
 
     public void revoke(String token) {
-        if (verify(token) == null) return;
-        try {
-            JsonNode n = JsonUtil.M.readTree(DEC.decode(token.substring(0, token.indexOf('.'))));
-            revoked.put(n.path("jti").asText(), n.path("exp").asLong());
-        } catch (Exception ignored) {
-            // invalid token: nothing to revoke
-        }
+        Map<String, String> c = verify(token);
+        if (c == null) return;
+        revoked.put(c.get("jti"), Long.parseLong(c.get("exp")));
         long now = Instant.now().getEpochSecond();
         revoked.entrySet().removeIf(e -> e.getValue() < now);
     }

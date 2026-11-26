@@ -1,132 +1,99 @@
 package com.pulseagent.rag;
 
-import com.pulseagent.config.AppProperties;
 import com.pulseagent.llm.EmbeddingService;
+import com.pulseagent.llm.GeminiClient;
+import com.pulseagent.llm.LlmFactory;
 import com.pulseagent.security.Redactor;
-import jakarta.annotation.PostConstruct;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import com.pulseagent.tenant.Crypto;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.attribute.PosixFilePermissions;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.stream.Stream;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Retrieval-augmented knowledge base over runbooks, past incidents and uploaded documents.
- * Documents are split into heading-based chunks, embedded, and searched by cosine similarity.
+ * Retrieval-augmented knowledge base per workspace: runbooks, past incidents and team docs.
+ * Documents live in the database; each workspace's search index is built lazily in memory,
+ * split into heading-based chunks, and searched by cosine similarity.
  */
 @Service
 public class KnowledgeBase {
 
-    public record Doc(String id, String title, String type, String source, String createdAt, int chunks) {}
+    public record Doc(String id, String title, String type, String source, String createdAt) {}
 
     public record Hit(String docId, String title, String type, double score, String excerpt) {}
 
     private record Chunk(String docId, String title, String type, String text, float[] vector) {}
 
-    private static final Logger log = LoggerFactory.getLogger(KnowledgeBase.class);
+    private record Index(String mode, List<Chunk> chunks, long builtAt) {}
+
     private static final int CHUNK_CHARS = 1200;
     private static final Set<String> TYPES = Set.of("runbook", "incident", "doc");
 
-    private final EmbeddingService embeddings;
-    private final Path seedDir;
-    private final Path uploadDir;
-    private final List<Doc> docs = new CopyOnWriteArrayList<>();
-    private final List<Chunk> chunks = new CopyOnWriteArrayList<>();
+    private final JdbcTemplate db;
+    private final LlmFactory llm;
+    private final Map<String, Index> indexes = new ConcurrentHashMap<>();
 
-    public KnowledgeBase(EmbeddingService embeddings, AppProperties props) {
-        this.embeddings = embeddings;
-        this.seedDir = Path.of(props.knowledge().dir()).toAbsolutePath().normalize();
-        this.uploadDir = Path.of(props.knowledge().dataDir()).toAbsolutePath().normalize().resolve("kb");
+    public KnowledgeBase(JdbcTemplate db, LlmFactory llm) {
+        this.db = db;
+        this.llm = llm;
     }
 
-    @PostConstruct
-    void load() {
-        Thread.ofVirtual().name("kb-loader").start(() -> {
-            try {
-                Files.createDirectories(uploadDir);
-                trySetOwnerOnly(uploadDir.getParent());
-                int n = loadDir(seedDir, "seed") + loadDir(uploadDir, "upload");
-                log.info("Knowledge base ready: {} documents, {} chunks", n, chunks.size());
-            } catch (Exception e) {
-                log.warn("Knowledge base load failed: {}", e.getMessage());
-            }
-        });
-    }
-
-    private int loadDir(Path dir, String source) throws IOException {
-        if (!Files.isDirectory(dir)) return 0;
-        List<Path> files;
-        try (Stream<Path> s = Files.walk(dir, 3)) {
-            files = s.filter(Files::isRegularFile)
-                    .filter(p -> p.toString().endsWith(".md") || p.toString().endsWith(".txt"))
-                    .sorted().toList();
-        }
-        int n = 0;
-        for (Path f : files) {
-            if (Files.size(f) > 500_000) continue;
-            String content = Files.readString(f, StandardCharsets.UTF_8);
-            String type = typeFor(f);
-            String id = f.getFileName().toString().replaceAll("\\.(md|txt)$", "");
-            index(id, titleOf(content, id), type, source, content);
-            n++;
-        }
-        return n;
-    }
-
-    private static String typeFor(Path f) {
-        String s = f.toString().toLowerCase(Locale.ROOT);
-        String name = f.getFileName().toString();
-        if (s.contains("/runbooks/") || name.startsWith("runbook-")) return "runbook";
-        if (s.contains("/incidents/") || name.startsWith("incident-")) return "incident";
-        return "doc";
-    }
-
-    /** Adds a document, persists it to the data directory, and indexes it. */
-    public Doc add(String title, String type, String content, String source) {
+    public Doc add(String ws, String title, String type, String content, String source) {
         String t = TYPES.contains(type) ? type : "doc";
-        String clean = Redactor.redact(content);
         String safeTitle = Redactor.redact(title.replaceAll("[\\r\\n]+", " ").trim());
-        String id = t + "-" + UUID.randomUUID().toString().substring(0, 8);
+        if (safeTitle.length() > 200) safeTitle = safeTitle.substring(0, 200);
+        String id = t + "-" + Crypto.randomToken(6).replaceAll("[^A-Za-z0-9]", "x").toLowerCase();
+        String body = "# " + safeTitle + "\n\n" + Redactor.redact(content);
+        Timestamp now = Timestamp.from(Instant.now());
+        db.update("insert into kb_docs(workspace_id, id, title, type, source, content, created_at) values (?,?,?,?,?,?,?)",
+                ws, id, safeTitle, t, source.length() > 100 ? source.substring(0, 100) : source, body, now);
+        indexes.remove(ws);
+        return new Doc(id, safeTitle, t, source, now.toInstant().toString());
+    }
+
+    public boolean delete(String ws, String id) {
+        boolean ok = db.update("delete from kb_docs where workspace_id = ? and id = ?", ws, id) > 0;
+        if (ok) indexes.remove(ws);
+        return ok;
+    }
+
+    public List<Doc> list(String ws) {
+        return db.query("select id, title, type, source, created_at from kb_docs where workspace_id = ? order by type, title",
+                (rs, i) -> new Doc(rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4), rs.getTimestamp(5).toInstant().toString()), ws);
+    }
+
+    public int size(String ws) {
+        Integer n = db.queryForObject("select count(*) from kb_docs where workspace_id = ?", Integer.class, ws);
+        return n == null ? 0 : n;
+    }
+
+    public String mode(String ws) {
+        return index(ws).mode();
+    }
+
+    public List<Hit> search(String ws, String query, int k, String typeFilter) {
+        if (query == null || query.isBlank()) return List.of();
+        Index idx = index(ws);
+        if (idx.chunks().isEmpty()) return List.of();
+        Optional<GeminiClient> gemini = llm.geminiFor(ws);
+        float[] q;
         try {
-            Files.createDirectories(uploadDir);
-            Path file = uploadDir.resolve(id + ".md").normalize();
-            if (!file.startsWith(uploadDir)) throw new IllegalStateException("invalid path");
-            Files.writeString(file, "# " + safeTitle + "\n\n" + clean, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            log.warn("Could not persist document: {}", e.getMessage());
+            q = EmbeddingService.embedQuery(gemini, idx.mode(), query.length() > 2000 ? query.substring(0, 2000) : query);
+        } catch (Exception e) {
+            indexes.remove(ws);
+            return List.of();
         }
-        return index(id, safeTitle, t, source, "# " + safeTitle + "\n\n" + clean);
-    }
-
-    private synchronized Doc index(String id, String title, String type, String source, String content) {
-        List<String> parts = chunk(content);
-        List<String> forEmbedding = parts.stream().map(p -> title + "\n" + p).toList();
-        List<float[]> vectors = embeddings.embedDocuments(forEmbedding);
-        for (int i = 0; i < parts.size(); i++) chunks.add(new Chunk(id, title, type, parts.get(i), vectors.get(i)));
-        Doc d = new Doc(id, title, type, source, Instant.now().toString(), parts.size());
-        docs.add(d);
-        return d;
-    }
-
-    public List<Hit> search(String query, int k, String typeFilter) {
-        if (query == null || query.isBlank() || chunks.isEmpty()) return List.of();
-        float[] q = embeddings.embedQuery(query.length() > 2000 ? query.substring(0, 2000) : query);
         List<Hit> scored = new ArrayList<>();
-        for (Chunk c : chunks) {
+        for (Chunk c : idx.chunks()) {
             if (typeFilter != null && !typeFilter.isBlank() && !typeFilter.equals(c.type())) continue;
             double s = EmbeddingService.cosine(q, c.vector());
             scored.add(new Hit(c.docId(), c.title(), c.type(), Math.round(s * 1000) / 1000.0,
@@ -142,11 +109,38 @@ public class KnowledgeBase {
         return top;
     }
 
-    public List<Doc> list() {
-        return docs.stream().sorted(Comparator.comparing(Doc::type).thenComparing(Doc::title)).toList();
+    private Index index(String ws) {
+        Optional<GeminiClient> gemini = llm.geminiFor(ws);
+        String wanted = gemini.isPresent() ? "gemini" : "local";
+        Index existing = indexes.get(ws);
+        // Rebuild when the embedding mode changes; a failed Gemini build retries at most every 10 minutes.
+        if (existing != null && (existing.mode().equals(wanted) || System.currentTimeMillis() - existing.builtAt() < 600_000)) {
+            return existing;
+        }
+        synchronized (this) {
+            existing = indexes.get(ws);
+            if (existing != null && existing.mode().equals(wanted)) return existing;
+            List<String[]> docs = db.query("select id, title, type, content from kb_docs where workspace_id = ?",
+                    (rs, i) -> new String[]{rs.getString(1), rs.getString(2), rs.getString(3), rs.getString(4)}, ws);
+            List<Chunk> meta = new ArrayList<>();
+            List<String> texts = new ArrayList<>();
+            for (String[] d : docs) {
+                for (String part : chunk(d[3])) {
+                    meta.add(new Chunk(d[0], d[1], d[2], part, null));
+                    texts.add(d[1] + "\n" + part);
+                }
+            }
+            EmbeddingService.Batch batch = EmbeddingService.embedDocuments(gemini, texts);
+            List<Chunk> chunks = new ArrayList<>(meta.size());
+            for (int i = 0; i < meta.size(); i++) {
+                Chunk m = meta.get(i);
+                chunks.add(new Chunk(m.docId(), m.title(), m.type(), m.text(), batch.vectors().get(i)));
+            }
+            Index idx = new Index(batch.mode(), List.copyOf(chunks), System.currentTimeMillis());
+            indexes.put(ws, idx);
+            return idx;
+        }
     }
-
-    public int size() { return docs.size(); }
 
     static List<String> chunk(String content) {
         List<String> out = new ArrayList<>();
@@ -161,17 +155,5 @@ public class KnowledgeBase {
         }
         if (!cur.toString().isBlank()) out.add(cur.toString().trim());
         return out;
-    }
-
-    private static String titleOf(String content, String fallback) {
-        return content.lines().filter(l -> l.startsWith("# ")).findFirst().map(l -> l.substring(2).trim()).orElse(fallback);
-    }
-
-    private static void trySetOwnerOnly(Path dir) {
-        try {
-            Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwx------"));
-        } catch (Exception ignored) {
-            // not a POSIX filesystem
-        }
     }
 }

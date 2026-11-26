@@ -1,65 +1,38 @@
 package com.pulseagent.llm;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 /**
- * Text embeddings for RAG. Uses Gemini embeddings when a key is configured and working,
- * otherwise a local hashed bag-of-words model so search still works offline and for free.
- * The mode is fixed once chosen, because vectors from the two models are not comparable.
+ * Text embeddings for RAG: Gemini embeddings when the workspace uses Gemini, otherwise a
+ * local hashed bag-of-words model so search works offline and for free. A whole index always
+ * uses one mode, because vectors from the two models are not comparable.
  */
-@Service
-public class EmbeddingService {
+public final class EmbeddingService {
 
-    private static final Logger log = LoggerFactory.getLogger(EmbeddingService.class);
     private static final int LOCAL_DIMS = 1024;
 
-    private final GeminiClient gemini;
-    private volatile String mode;
+    public record Batch(String mode, List<float[]> vectors) {}
 
-    public EmbeddingService(GeminiClient gemini) {
-        this.gemini = gemini;
-    }
+    private EmbeddingService() {}
 
-    public synchronized String mode() {
-        if (mode == null) {
-            mode = "local";
-            if (gemini.available()) {
-                try {
-                    gemini.embed(List.of("connectivity check"), "RETRIEVAL_QUERY");
-                    mode = "gemini";
-                } catch (Exception e) {
-                    log.warn("Gemini embeddings unavailable ({}); using local embeddings.", e.getMessage());
-                }
-            }
-            log.info("Embedding mode: {}", mode);
-        }
-        return mode;
-    }
-
-    public List<float[]> embedDocuments(List<String> texts) {
-        if (texts.isEmpty()) return List.of();
-        if ("gemini".equals(mode())) {
+    public static Batch embedDocuments(Optional<GeminiClient> gemini, List<String> texts) {
+        if (gemini.isPresent() && !texts.isEmpty()) {
             try {
-                return normalizeAll(gemini.embed(texts, "RETRIEVAL_DOCUMENT"));
+                return new Batch("gemini", normalizeAll(gemini.get().embed(texts, "RETRIEVAL_DOCUMENT")));
             } catch (Exception e) {
-                throw new LlmException("Embedding failed: " + e.getMessage());
+                // fall back to local below
             }
         }
         List<float[]> out = new ArrayList<>(texts.size());
         for (String t : texts) out.add(local(t));
-        return out;
+        return new Batch("local", out);
     }
 
-    public float[] embedQuery(String text) {
-        if ("gemini".equals(mode())) {
-            return normalize(gemini.embed(List.of(text), "RETRIEVAL_QUERY").get(0));
-        }
+    public static float[] embedQuery(Optional<GeminiClient> gemini, String mode, String text) {
+        if ("gemini".equals(mode) && gemini.isPresent()) return normalize(gemini.get().embed(List.of(text), "RETRIEVAL_QUERY").get(0));
         return local(text);
     }
 
@@ -87,8 +60,7 @@ public class EmbeddingService {
 
     private static void add(float[] v, String token, float w) {
         int h = token.hashCode();
-        int idx = Math.floorMod(h, LOCAL_DIMS);
-        v[idx] += ((h >>> 16) & 1) == 0 ? w : -w;
+        v[Math.floorMod(h, LOCAL_DIMS)] += ((h >>> 16) & 1) == 0 ? w : -w;
     }
 
     private static List<float[]> normalizeAll(List<float[]> list) {

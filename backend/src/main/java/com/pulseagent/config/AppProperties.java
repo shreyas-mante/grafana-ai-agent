@@ -6,11 +6,18 @@ import java.util.List;
 
 /**
  * All configuration comes from environment variables. Secrets are never logged
- * and toString() is overridden on records that hold them.
+ * and toString() is overridden on records that hold them. The llm, prometheus and code
+ * sections are defaults for the bootstrap workspace only; other workspaces configure
+ * their own integrations in the UI.
  */
 @ConfigurationProperties(prefix = "app")
-public record AppProperties(Security security, Llm llm, Prometheus prometheus, Code code,
+public record AppProperties(Platform platform, Security security, Llm llm, Prometheus prometheus, Code code,
                             Knowledge knowledge, Limits limits) {
+
+    public record Platform(String databaseUrl, String publicUrl, String signup, String encryptionKey,
+                           boolean allowPrivateTargets) {
+        @Override public String toString() { return "Platform[publicUrl=" + publicUrl + ", signup=" + signup + "]"; }
+    }
 
     public record Security(String adminKeySha256, String ingestKeySha256, String sessionSecret,
                            boolean secureCookies, int sessionHours) {
@@ -23,16 +30,12 @@ public record AppProperties(Security security, Llm llm, Prometheus prometheus, C
         @Override public String toString() { return "Llm[model=" + model + ", key=" + (configured() ? "set" : "unset") + "]"; }
     }
 
-    /** With username set, uses basic auth (Grafana Cloud: instance ID + access token); otherwise a bearer token. */
     public record Prometheus(String url, String bearerToken, String username) {
         @Override public String toString() { return "Prometheus[url=" + url + "]"; }
     }
 
     public record Code(String localRepoPath, String githubRepo, String githubToken, String githubApiUrl,
                        List<String> appPackages) {
-        public boolean githubConfigured() {
-            return githubRepo != null && !githubRepo.isBlank() && githubToken != null && !githubToken.isBlank();
-        }
         public boolean localConfigured() { return localRepoPath != null && !localRepoPath.isBlank(); }
         @Override public String toString() { return "Code[repo=" + githubRepo + ", local=" + localRepoPath + "]"; }
     }

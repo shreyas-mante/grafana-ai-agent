@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pulseagent.config.JsonUtil;
+import com.pulseagent.tenant.WorkspaceEnv;
 import com.pulseagent.tools.ToolCatalog;
 import org.springframework.stereotype.Component;
 
@@ -25,7 +26,21 @@ public class OfflineInvestigator {
         this.tools = tools;
     }
 
-    public void investigate(Investigation inv) {
+    public void investigate(Investigation inv, WorkspaceEnv env, Runnable checkpoint) {
+        this.env.set(env);
+        this.checkpoint.set(checkpoint);
+        try {
+            run(inv);
+        } finally {
+            this.env.remove();
+            this.checkpoint.remove();
+        }
+    }
+
+    private final ThreadLocal<WorkspaceEnv> env = new ThreadLocal<>();
+    private final ThreadLocal<Runnable> checkpoint = new ThreadLocal<>();
+
+    private void run(Investigation inv) {
         String svc = inv.service;
         String sel = svc == null ? "" : "{job=~\"(?i).*" + svc.replaceAll("[^A-Za-z0-9_-]", "") + ".*\"}";
         String err5xx = svc == null ? "{status=~\"5..\"}" : "{job=~\"(?i).*" + svc.replaceAll("[^A-Za-z0-9_-]", "") + ".*\",status=~\"5..\"}";
@@ -118,14 +133,14 @@ public class OfflineInvestigator {
             report.putArray("knowledgeUsed").add(best.path("title").asText());
         }
         ArrayNode next = report.putArray("nextSteps");
-        next.add("Add GEMINI_API_KEY to get an AI-written root cause analysis and code fix.");
+        next.add("Connect an AI provider in Settings (Gemini has a free tier) to get an AI-written root cause analysis and code fix.");
         if (code != null) next.add("Review " + code.path("file").asText() + " line " + code.path("line").asInt() + " and the commit that last changed it.");
         report.set("unknowns", unknowns);
         inv.complete(report);
     }
 
-    public String chat(Investigation inv, String message) {
-        JsonNode r = tools.execute("search_knowledge_base", obj("query", message), inv);
+    public String chat(Investigation inv, WorkspaceEnv env, String message) {
+        JsonNode r = tools.execute("search_knowledge_base", obj("query", message), inv, env);
         StringBuilder sb = new StringBuilder("Offline mode (no AI key configured). Closest matches in your knowledge base:\n");
         for (JsonNode h : r.path("results")) {
             sb.append("- ").append(h.path("title").asText()).append(" (").append(h.path("type").asText())
@@ -137,8 +152,9 @@ public class OfflineInvestigator {
     private JsonNode run(Investigation inv, String tool, ObjectNode args) {
         int idx = inv.addStep(tool, args);
         long t0 = System.currentTimeMillis();
-        JsonNode r = tools.execute(tool, args, inv);
+        JsonNode r = tools.execute(tool, args, inv, env.get());
         inv.finishStep(idx, r.has("error") ? "failed" : "done", AgentRunner.describe(tool, r), System.currentTimeMillis() - t0);
+        checkpoint.get().run();
         return r;
     }
 

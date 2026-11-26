@@ -11,9 +11,15 @@ import java.util.List;
  * these directly, so facts like file, line, author and commit never depend on the model's wording.
  */
 public interface ToolContext {
+    String workspaceId();
+
+    String investigationId();
+
     void attachChart(String title, String query, JsonNode points, JsonNode summary);
 
-    void attachCode(String errorGroupId, CodeContext ctx);
+    void attachCode(String key, CodeContext ctx);
 
     void attachKnowledge(List<KnowledgeBase.Hit> hits);
+
+    void attachAction(String actionId);
 }

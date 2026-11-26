@@ -3,7 +3,6 @@ package com.pulseagent.code;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.pulseagent.code.CodeModels.BlameInfo;
 import com.pulseagent.code.CodeModels.CommitInfo;
-import com.pulseagent.config.AppProperties;
 import com.pulseagent.config.JsonUtil;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -31,19 +30,19 @@ class GitHubProvider implements CodeModels.CodeProvider {
     private final String name;
     private final Map<String, List<String>> treeCache = new ConcurrentHashMap<>();
 
-    GitHubProvider(AppProperties.Code cfg) {
-        if (!cfg.githubRepo().matches("[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}")) {
-            throw new IllegalStateException("APP_GITHUB_REPO must look like owner/name");
+    GitHubProvider(String repo, String token, String apiUrl) {
+        if (repo == null || !repo.matches("[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}")) {
+            throw new IllegalStateException("GitHub repository must look like owner/name");
         }
-        String[] parts = cfg.githubRepo().split("/");
+        String[] parts = repo.split("/");
         this.owner = parts[0];
         this.name = parts[1];
         var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
         factory.setReadTimeout(Duration.ofSeconds(20));
         this.rest = RestClient.builder()
                 .requestFactory(factory)
-                .baseUrl(cfg.githubApiUrl())
-                .defaultHeader("Authorization", "Bearer " + cfg.githubToken())
+                .baseUrl(apiUrl)
+                .defaultHeader("Authorization", "Bearer " + token)
                 .defaultHeader("X-GitHub-Api-Version", "2022-11-28")
                 .defaultHeader("User-Agent", "pulseagent")
                 .build();

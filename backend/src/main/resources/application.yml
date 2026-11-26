@@ -32,6 +32,13 @@ spring:
     problemdetails:
       enabled: false
 
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  h2:
+    console:
+      enabled: false
+
 management:
   endpoints:
     web:
@@ -47,6 +54,16 @@ logging:
     org.springframework.security: WARN
 
 app:
+  platform:
+    # postgres://user:pass@host/db (Neon) or a jdbc: URL. Empty = embedded H2 file in the data dir.
+    database-url: ${DATABASE_URL:}
+    public-url: ${APP_PUBLIC_URL:http://127.0.0.1:8080}
+    # open = anyone can sign up (each gets their own workspace), invite = invite links only, closed = no sign-up
+    signup: ${APP_SIGNUP:invite}
+    # Encrypts integration secrets at rest (AES-256-GCM). Required in production.
+    encryption-key: ${APP_ENCRYPTION_KEY:}
+    # Only for local development: lets workspaces call localhost/private-network URLs.
+    allow-private-targets: ${APP_ALLOW_PRIVATE_TARGETS:false}
   security:
     # Only SHA-256 hashes of keys are configured, never the keys themselves.
     admin-key-sha256: ${APP_ADMIN_KEY_SHA256:}

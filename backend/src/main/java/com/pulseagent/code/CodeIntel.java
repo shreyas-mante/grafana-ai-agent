@@ -4,12 +4,10 @@ import com.pulseagent.code.CodeModels.BlameInfo;
 import com.pulseagent.code.CodeModels.CodeContext;
 import com.pulseagent.code.CodeModels.CodeProvider;
 import com.pulseagent.code.CodeModels.CommitInfo;
-import com.pulseagent.config.AppProperties;
 import com.pulseagent.errors.ErrorEventRequest;
 import com.pulseagent.security.Redactor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -19,23 +17,23 @@ import java.util.Map;
 import java.util.Optional;
 
 /** Maps a stack frame to the exact file and line at the deployed commit, with blame details. */
-@Service
-public class CodeIntelService {
+public class CodeIntel {
 
-    private static final Logger log = LoggerFactory.getLogger(CodeIntelService.class);
+    private static final Logger log = LoggerFactory.getLogger(CodeIntel.class);
     private static final int CONTEXT_LINES = 12;
     private final CodeProvider provider;
 
-    public CodeIntelService(AppProperties props) {
-        CodeProvider p = null;
-        try {
-            if (props.code().githubConfigured()) p = new GitHubProvider(props.code());
-            else if (props.code().localConfigured()) p = new LocalGitProvider(props.code().localRepoPath());
-        } catch (Exception e) {
-            log.warn("Code integration disabled: {}", e.getMessage());
-        }
-        this.provider = p;
-        log.info("Code provider: {}", p == null ? "none" : p.name());
+    public CodeIntel(CodeProvider provider) {
+        this.provider = provider;
+    }
+
+    /** GitHub (workspace token) or a local checkout (operator-configured, bootstrap workspace only). */
+    public static CodeIntel github(String repo, String token) {
+        return new CodeIntel(new GitHubProvider(repo, token, "https://api.github.com"));
+    }
+
+    public static CodeIntel local(String path) {
+        return new CodeIntel(new LocalGitProvider(path));
     }
 
     public String providerName() { return provider == null ? "none" : provider.name(); }
