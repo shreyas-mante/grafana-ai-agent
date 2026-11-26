@@ -21,7 +21,7 @@ COPY backend/ backend/
 COPY --from=ui /src/backend/src/main/resources/static/ backend/src/main/resources/static/
 RUN mvn -q -B -pl backend -am -DskipTests package
 
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 RUN addgroup -S app && adduser -S -G app -H -s /sbin/nologin app \
     && mkdir -p /app/data && chown app:app /app/data
 WORKDIR /app
