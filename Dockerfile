@@ -2,7 +2,7 @@
 # Multi-stage build: only the compiled jar and the knowledge seed reach the final image.
 # No source code, build tools, or secrets are included, and the app runs as a non-root user.
 
-FROM node:22-alpine AS ui
+FROM node:26-alpine AS ui
 WORKDIR /src/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
