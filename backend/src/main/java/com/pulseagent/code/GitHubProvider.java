@@ -15,6 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -76,7 +77,7 @@ class GitHubProvider implements CodeModels.CodeProvider {
     }
 
     @Override
-    public BlameInfo blame(String ref, String path, int line) {
+    public Map<Integer, BlameInfo> blameRange(String ref, String path, int start, int end) {
         String query = """
             query($owner:String!, $name:String!, $ref:String!, $path:String!) {
               repository(owner:$owner, name:$name) {
@@ -100,23 +101,26 @@ class GitHubProvider implements CodeModels.CodeProvider {
         body.put("query", query);
         body.putObject("variables").put("owner", owner).put("name", name).put("ref", ref).put("path", path);
         JsonNode res = rest.post().uri("/graphql").contentType(MediaType.APPLICATION_JSON).body(body).retrieve().body(JsonNode.class);
-        if (res == null) return null;
+        Map<Integer, BlameInfo> result = new HashMap<>();
+        if (res == null) return result;
         for (JsonNode r : res.path("data").path("repository").path("object").path("blame").path("ranges")) {
-            if (line >= r.path("startingLine").asInt() && line <= r.path("endingLine").asInt()) {
-                JsonNode c = r.path("commit");
-                JsonNode pr = c.path("associatedPullRequests").path("nodes").path(0);
-                String oid = c.path("oid").asText();
-                return new BlameInfo(oid, oid.length() >= 7 ? oid.substring(0, 7) : oid,
-                        c.path("author").path("name").asText(null),
-                        c.path("author").path("user").path("login").asText(null),
-                        c.path("committedDate").asText(null),
-                        c.path("messageHeadline").asText(null),
-                        pr.isMissingNode() ? null : pr.path("number").asInt(),
-                        pr.isMissingNode() ? null : pr.path("title").asText(null),
-                        pr.isMissingNode() ? null : pr.path("url").asText(null));
-            }
+            int from = Math.max(start, r.path("startingLine").asInt());
+            int to = Math.min(end, r.path("endingLine").asInt());
+            if (from > to) continue;
+            JsonNode c = r.path("commit");
+            JsonNode pr = c.path("associatedPullRequests").path("nodes").path(0);
+            String oid = c.path("oid").asText();
+            BlameInfo b = new BlameInfo(oid, oid.length() >= 7 ? oid.substring(0, 7) : oid,
+                    c.path("author").path("name").asText(null),
+                    c.path("author").path("user").path("login").asText(null),
+                    c.path("committedDate").asText(null),
+                    c.path("messageHeadline").asText(null),
+                    pr.isMissingNode() ? null : pr.path("number").asInt(),
+                    pr.isMissingNode() ? null : pr.path("title").asText(null),
+                    pr.isMissingNode() ? null : pr.path("url").asText(null));
+            for (int i = from; i <= to; i++) result.put(i, b);
         }
-        return null;
+        return result;
     }
 
     @Override

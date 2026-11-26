@@ -25,6 +25,7 @@ public class AgentRunner {
 
             How to investigate:
             1. If the question mentions failures, errors or 5xx, call get_recent_errors. For the most relevant error, call get_code_context to get the exact file, line, author and commit.
+               Look at linesChangedByNewestCommit: a recent change a few lines away from the failing line is often the real cause, even when the failing line itself is old.
             2. Call list_metrics before writing PromQL, and only use metric names that exist.
             3. Query the golden signals for the service over the window: traffic, error rate, latency (p95), and saturation (connection pools, CPU, memory, queues). Compare baselineMean with recentMean.
             4. Call search_knowledge_base with the exception message or symptom to find matching runbooks and past incidents.
@@ -152,7 +153,7 @@ public class AgentRunner {
         return text.toString();
     }
 
-    private static String describe(String tool, JsonNode r) {
+    static String describe(String tool, JsonNode r) {
         if (r.has("error")) return r.path("error").asText();
         return switch (tool) {
             case "list_metrics" -> r.path("matching").asInt() + " matching metrics";

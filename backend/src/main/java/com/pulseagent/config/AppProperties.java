@@ -39,5 +39,5 @@ public record AppProperties(Security security, Llm llm, Prometheus prometheus, C
     public record Knowledge(String dir, String dataDir) {}
 
     public record Limits(int maxRangeMinutes, int minStepSeconds, int maxSeries, long maxBodyBytes,
-                         int requestsPerMinute, int loginPerMinute, int aiPerMinute) {}
+                         int requestsPerMinute, int loginPerMinute, int aiPerMinute, int ingestPerMinute) {}
 }

@@ -10,7 +10,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -51,20 +53,30 @@ class LocalGitProvider implements CodeModels.CodeProvider {
     }
 
     @Override
-    public BlameInfo blame(String ref, String path, int line) {
-        String out = git("blame", "--porcelain", "-L", line + "," + line, ref, "--", path);
-        if (out == null) return null;
-        String commit = null, author = null, summary = null, date = null;
+    public Map<Integer, BlameInfo> blameRange(String ref, String path, int start, int end) {
+        Map<Integer, BlameInfo> result = new HashMap<>();
+        String out = git("blame", "--porcelain", "-L", start + "," + end, ref, "--", path);
+        if (out == null) return result;
+        Map<String, String[]> info = new HashMap<>(); // sha -> [author, time, summary]
+        Map<Integer, String> lineSha = new HashMap<>();
+        String current = null;
         for (String l : out.lines().toList()) {
-            if (commit == null && l.matches("^[0-9a-f]{40} .*")) commit = l.substring(0, 40);
-            else if (l.startsWith("author ")) author = l.substring(7);
-            else if (l.startsWith("author-time ")) date = Instant.ofEpochSecond(Long.parseLong(l.substring(12).trim())).toString();
-            else if (l.startsWith("summary ")) summary = l.substring(8);
+            if (l.matches("^[0-9a-f]{40} \\d+ \\d+.*")) {
+                String[] p = l.split(" ");
+                current = p[0];
+                lineSha.put(Integer.parseInt(p[2]), current);
+                info.computeIfAbsent(current, k -> new String[3]);
+            } else if (current != null && l.startsWith("author ")) info.get(current)[0] = l.substring(7);
+            else if (current != null && l.startsWith("author-time ")) info.get(current)[1] = Instant.ofEpochSecond(Long.parseLong(l.substring(12).trim())).toString();
+            else if (current != null && l.startsWith("summary ")) info.get(current)[2] = l.substring(8);
         }
-        if (commit == null) return null;
-        boolean uncommitted = commit.chars().allMatch(c -> c == '0');
-        return new BlameInfo(commit, commit.substring(0, 7), uncommitted ? "Not committed yet" : author, null, date,
-                summary, null, null, null);
+        for (var e : lineSha.entrySet()) {
+            String sha = e.getValue();
+            String[] i = info.get(sha);
+            boolean uncommitted = sha.chars().allMatch(c -> c == '0');
+            result.put(e.getKey(), new BlameInfo(sha, sha.substring(0, 7), uncommitted ? "Not committed yet" : i[0], null, i[1], i[2], null, null, null));
+        }
+        return result;
     }
 
     @Override

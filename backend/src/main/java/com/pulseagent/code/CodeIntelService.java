@@ -11,8 +11,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /** Maps a stack frame to the exact file and line at the deployed commit, with blame details. */
@@ -61,8 +64,20 @@ public class CodeIntelService {
             int end = Math.min(all.size(), line + CONTEXT_LINES);
             List<String> snippet = all.subList(start - 1, end).stream()
                     .map(l -> Redactor.redact(l.length() > 300 ? l.substring(0, 300) : l)).toList();
-            BlameInfo blame = provider.blame(ref, path.get(), line);
-            return Optional.of(new CodeContext(provider.name(), path.get(), line, ref, start, snippet, blame, note));
+            Map<Integer, BlameInfo> blames = provider.blameRange(ref, path.get(), start, end);
+            BlameInfo blame = blames.get(line);
+            List<String> lineCommits = new ArrayList<>();
+            for (int n = start; n <= end; n++) {
+                BlameInfo b = blames.get(n);
+                lineCommits.add(b == null ? null : b.shortCommit());
+            }
+            Map<String, BlameInfo> distinct = new LinkedHashMap<>();
+            blames.values().forEach(b -> distinct.putIfAbsent(b.commit(), b));
+            List<BlameInfo> recent = distinct.values().stream()
+                    .sorted(Comparator.comparing((BlameInfo b) -> b.date() == null ? "" : b.date()).reversed())
+                    .limit(5).toList();
+            return Optional.of(new CodeContext(provider.name(), path.get(), line, ref, start, snippet, blame,
+                    lineCommits, recent, note));
         } catch (Exception e) {
             log.warn("Code lookup failed: {}", e.getClass().getSimpleName());
             return Optional.empty();

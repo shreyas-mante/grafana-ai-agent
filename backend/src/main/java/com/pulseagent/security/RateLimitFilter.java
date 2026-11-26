@@ -42,6 +42,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
             if (path.equals("/api/auth/login")) {
                 bucket = "login";
                 limit = limits.loginPerMinute();
+            } else if (path.equals("/api/v1/errors")) {
+                // Machine ingest has its own bucket so a noisy app can't lock people out of the UI.
+                bucket = "ingest";
+                limit = limits.ingestPerMinute();
             } else if ("POST".equals(req.getMethod()) && (path.startsWith("/api/investigations") || path.startsWith("/api/v1/investigations") || path.startsWith("/api/v1/webhooks"))) {
                 bucket = "ai";
                 limit = limits.aiPerMinute();

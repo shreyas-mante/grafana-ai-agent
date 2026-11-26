@@ -144,6 +144,10 @@ button.ghost { border-color: transparent; background: transparent; }
 .code-line { padding: 0 10px; white-space: pre; }
 .code-line.hot { background: var(--bad-bg); color: var(--bad); }
 .ln { display: inline-block; width: 34px; color: var(--muted); user-select: none; }
+.sha { display: inline-block; width: 62px; color: var(--muted); font-size: 10.5px; user-select: none; }
+.code-line.changed { background: var(--warn-bg); }
+.code-line.changed.hot { background: var(--bad-bg); }
+.newest { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
 .code-card { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 12px; }
 .code-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
 .code-body { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 10px; }

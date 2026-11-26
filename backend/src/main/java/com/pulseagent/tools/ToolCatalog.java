@@ -144,6 +144,18 @@ public class ToolCatalog {
                         ObjectNode o = JsonUtil.M.valueToTree(cc.get());
                         o.put("frame", frame.className() + "." + frame.methodName());
                         o.put("failingLineText", cc.get().lines().get(cc.get().line() - cc.get().startLine()));
+                        o.remove("lineCommits");
+                        var c = cc.get();
+                        if (!c.recentChanges().isEmpty()) {
+                            var newest = c.recentChanges().get(0);
+                            ArrayNode changed = o.putArray("linesChangedByNewestCommit");
+                            for (int k = 0; k < c.lines().size(); k++) {
+                                if (newest.shortCommit().equals(c.lineCommits().get(k))) {
+                                    changed.addObject().put("line", c.startLine() + k).put("text", c.lines().get(k).trim());
+                                }
+                            }
+                            o.put("newestCommitNearFailure", newest.shortCommit() + " by " + newest.author() + " at " + newest.date() + ": " + newest.summary());
+                        }
                         locations.add(o);
                     }
                     if (locations.isEmpty()) throw new ToolException("Source not available (code provider: " + code.providerName() + ")");

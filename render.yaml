@@ -1,0 +1,33 @@
+# Render Blueprint (free plan). Render → New → Blueprint → pick this repo.
+# Secrets marked "sync: false" are entered in the Render dashboard and never stored in git.
+services:
+  - type: web
+    name: pulseagent
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: APP_ADMIN_KEY_SHA256
+        sync: false
+      - key: APP_INGEST_KEY_SHA256
+        sync: false
+      - key: APP_SESSION_SECRET
+        generateValue: true
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: APP_LLM_MODEL
+        value: gemini-2.5-flash
+      - key: APP_PROMETHEUS_URL
+        sync: false
+      - key: APP_PROMETHEUS_TOKEN
+        sync: false
+      - key: APP_GITHUB_REPO
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: APP_CODE_PACKAGES
+        value: com.demo
+      - key: APP_SECURE_COOKIES
+        value: "true"

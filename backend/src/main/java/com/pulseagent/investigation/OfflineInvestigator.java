@@ -93,8 +93,23 @@ public class OfflineInvestigator {
         report.set("evidence", evidence);
         if (code != null) {
             ObjectNode cf = report.putObject("codeFinding");
-            cf.put("file", code.path("file").asText()).put("line", code.path("line").asInt())
-                    .put("explanation", "The exception is thrown from this line: " + code.path("failingLineText").asText().trim());
+            String expl = "The failure passes through this line: " + code.path("failingLineText").asText().trim() + ".";
+            JsonNode changed = code.path("linesChangedByNewestCommit");
+            if (changed.size() > 0 && changed.size() <= 6) {
+                int failing = code.path("line").asInt();
+                JsonNode nearest = changed.get(0);
+                for (JsonNode ch : changed) {
+                    boolean isComment = ch.path("text").asText().startsWith("/") || ch.path("text").asText().startsWith("*");
+                    boolean nearestIsComment = nearest.path("text").asText().startsWith("/") || nearest.path("text").asText().startsWith("*");
+                    if ((nearestIsComment && !isComment) || (isComment == nearestIsComment
+                            && Math.abs(ch.path("line").asInt() - failing) < Math.abs(nearest.path("line").asInt() - failing))) {
+                        nearest = ch;
+                    }
+                }
+                expl += " The most recent commit near it (" + code.path("newestCommitNearFailure").asText() + ") changed line "
+                        + nearest.path("line").asInt() + ": " + nearest.path("text").asText() + ". Review that change first.";
+            }
+            cf.put("file", code.path("file").asText()).put("line", code.path("line").asInt()).put("explanation", expl);
         }
         if (strongKb) {
             String fix = extractSection(best.path("excerpt").asText(), "fix");
@@ -123,7 +138,7 @@ public class OfflineInvestigator {
         int idx = inv.addStep(tool, args);
         long t0 = System.currentTimeMillis();
         JsonNode r = tools.execute(tool, args, inv);
-        inv.finishStep(idx, r.has("error") ? "failed" : "done", r.has("error") ? r.path("error").asText() : "done", System.currentTimeMillis() - t0);
+        inv.finishStep(idx, r.has("error") ? "failed" : "done", AgentRunner.describe(tool, r), System.currentTimeMillis() - t0);
         return r;
     }
 

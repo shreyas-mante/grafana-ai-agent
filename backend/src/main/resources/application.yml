@@ -81,3 +81,4 @@ app:
     requests-per-minute: 240
     login-per-minute: 10
     ai-per-minute: 15
+    ingest-per-minute: 1200

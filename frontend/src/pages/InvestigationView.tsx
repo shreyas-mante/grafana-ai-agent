@@ -32,6 +32,8 @@ function fmt(v: any) {
 
 function CodeCard({ c }: { c: any }) {
   const b = c.blame || {};
+  const newest = (c.recentChanges || [])[0];
+  const commits: (string | null)[] = c.lineCommits || [];
   return (
     <div className="code-card">
       <div className="code-head">
@@ -43,9 +45,11 @@ function CodeCard({ c }: { c: any }) {
         <pre className="code">
           {c.lines.map((l: string, i: number) => {
             const n = c.startLine + i;
+            const isNew = newest && commits[i] === newest.shortCommit && (c.recentChanges || []).length > 1;
+            const cls = 'code-line' + (n === c.line ? ' hot' : '') + (isNew ? ' changed' : '');
             return (
-              <div key={n} className={n === c.line ? 'code-line hot' : 'code-line'}>
-                <span className="ln">{n}</span>{l || ' '}
+              <div key={n} className={cls} title={commits[i] ? 'Last changed in ' + commits[i] : undefined}>
+                <span className="ln">{n}</span><span className="sha">{commits[i] || ''}</span>{l || ' '}
               </div>
             );
           })}
@@ -61,6 +65,14 @@ function CodeCard({ c }: { c: any }) {
               ? <a href={b.prUrl} target="_blank" rel="noopener noreferrer">#{b.prNumber} {b.prTitle}</a>
               : <>#{b.prNumber} {b.prTitle}</>}</dd></>)}
           </dl>
+          {newest && (c.recentChanges || []).length > 1 && newest.commit !== b.commit && (
+            <div className="newest">
+              <div className="blame-title">Newest change nearby</div>
+              <div><span className="mono">{newest.shortCommit}</span> {newest.authorLogin ? '@' + newest.authorLogin : newest.author}</div>
+              <div className="muted">{newest.summary}</div>
+              <div className="muted tiny">Highlighted in yellow</div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -223,7 +235,7 @@ export default function InvestigationView({ id }: { id: string }) {
               <h3>Suggested fix</h3>
               <p>{r.suggestedFix.explanation}</p>
               {r.suggestedFix.diff && <Diff text={r.suggestedFix.diff} />}
-              <p className="hint">Suggested by AI from the evidence above. Review before applying.</p>
+              <p className="hint">{inv.mode === 'offline' ? 'From your knowledge base.' : 'Suggested by AI from the evidence above.'} Review before applying.</p>
             </div>
           )}
 

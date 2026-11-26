@@ -10,8 +10,13 @@ public final class CodeModels {
 
     public record CommitInfo(String sha, String author, String date, String message) {}
 
+    /**
+     * lineCommits: short commit SHA for each snippet line. recentChanges: distinct commits that touched
+     * the snippet, newest first, so a nearby changed line (often the real cause) is visible.
+     */
     public record CodeContext(String provider, String file, int line, String ref, int startLine,
-                              List<String> lines, BlameInfo blame, String note) {}
+                              List<String> lines, BlameInfo blame, List<String> lineCommits,
+                              List<BlameInfo> recentChanges, String note) {}
 
     public interface CodeProvider {
         String name();
@@ -21,7 +26,12 @@ public final class CodeModels {
         /** Returns null if the file does not exist at that ref. */
         String fileContent(String ref, String path);
 
-        BlameInfo blame(String ref, String path, int line);
+        /** Blame for lines start..end inclusive, keyed by line number. */
+        java.util.Map<Integer, BlameInfo> blameRange(String ref, String path, int start, int end);
+
+        default BlameInfo blame(String ref, String path, int line) {
+            return blameRange(ref, path, line, line).get(line);
+        }
 
         List<CommitInfo> recentCommits(int hours);
     }

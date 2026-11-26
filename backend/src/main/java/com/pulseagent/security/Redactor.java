@@ -15,7 +15,7 @@ public final class Redactor {
             new Rule(Pattern.compile("(?i)\\b(bearer)\\s+[A-Za-z0-9._~+/=-]{8,}"), "$1 [REDACTED]"),
             new Rule(Pattern.compile("(?i)\\b(password|passwd|pwd|secret|token|api[_-]?key|access[_-]?key|authorization|client[_-]?secret)(\\s*[:=]\\s*)(\"[^\"]*\"|'[^']*'|[^\\s,;&]+)"), "$1$2[REDACTED]"),
             new Rule(Pattern.compile("\\bAKIA[0-9A-Z]{16}\\b"), "[REDACTED_AWS_KEY]"),
-            new Rule(Pattern.compile("\\bAIza[0-9A-Za-z_-]{35}\\b"), "[REDACTED_GOOGLE_KEY]"),
+            new Rule(Pattern.compile("\\bAIza[0-9A-Za-z_-]{30,}"), "[REDACTED_GOOGLE_KEY]"),
             new Rule(Pattern.compile("\\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{20,}\\b"), "[REDACTED_GITHUB_TOKEN]"),
             new Rule(Pattern.compile("\\bgithub_pat_[A-Za-z0-9_]{20,}\\b"), "[REDACTED_GITHUB_TOKEN]"),
             new Rule(Pattern.compile("\\bsk-[A-Za-z0-9_-]{20,}\\b"), "[REDACTED_API_KEY]"),

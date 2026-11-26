@@ -38,6 +38,7 @@ public class ErrorReporter {
             }, new ThreadPoolExecutor.DiscardPolicy());
     private final AtomicLong windowSecond = new AtomicLong();
     private final AtomicLong windowCount = new AtomicLong();
+    private final java.util.Map<String, Long> lastSent = new java.util.concurrent.ConcurrentHashMap<>();
     private final URI uri;
 
     public ErrorReporter(PulseAgentProperties props) {
@@ -50,7 +51,7 @@ public class ErrorReporter {
     }
 
     public void report(Throwable t, String httpMethod, String path) {
-        if (!allow()) return;
+        if (!firstThisSecond(t) || !allow()) return;
         try {
             executor.execute(() -> send(t, httpMethod, path));
         } catch (Exception ignored) {
@@ -100,6 +101,16 @@ public class ErrorReporter {
         } catch (Exception e) {
             log.debug("PulseAgent error report failed: {}", e.getClass().getSimpleName());
         }
+    }
+
+    /** Client-side de-duplication: the same error from the same code location at most once per second. */
+    private boolean firstThisSecond(Throwable t) {
+        StackTraceElement[] st = t.getStackTrace();
+        String key = t.getClass().getName() + "@" + (st.length > 0 ? st[0].getClassName() + ":" + st[0].getLineNumber() : "");
+        long sec = System.currentTimeMillis() / 1000;
+        Long prev = lastSent.put(key, sec);
+        if (lastSent.size() > 1000) lastSent.clear();
+        return prev == null || prev != sec;
     }
 
     private boolean allow() {
