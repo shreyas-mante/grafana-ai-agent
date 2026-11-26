@@ -64,6 +64,7 @@ app:
   prometheus:
     url: ${APP_PROMETHEUS_URL:http://localhost:9090}
     bearer-token: ${APP_PROMETHEUS_TOKEN:}
+    username: ${APP_PROMETHEUS_USERNAME:}
   code:
     local-repo-path: ${APP_CODE_REPO_PATH:}
     github-repo: ${APP_GITHUB_REPO:}

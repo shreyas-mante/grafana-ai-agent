@@ -21,6 +21,8 @@ services:
         value: gemini-2.5-flash
       - key: APP_PROMETHEUS_URL
         sync: false
+      - key: APP_PROMETHEUS_USERNAME
+        sync: false
       - key: APP_PROMETHEUS_TOKEN
         sync: false
       - key: APP_GITHUB_REPO

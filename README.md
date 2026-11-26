@@ -43,6 +43,8 @@ Stop everything with `scripts/stop.sh`.
 
 ## Deploy for free on Render
 
+**Full step-by-step guide: [DEPLOY.md](DEPLOY.md)** (Render + Grafana Cloud + Gemini, all free). In short:
+
 1. Push this repo to GitHub (keep it **private**).
 2. In Render, choose **New**, then **Blueprint**, and pick the repo. It reads `render.yaml` (free plan, Docker).
 3. Enter the secret values when Render asks for them:

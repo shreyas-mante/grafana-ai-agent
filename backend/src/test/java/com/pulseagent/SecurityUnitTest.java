@@ -19,7 +19,7 @@ class SecurityUnitTest {
         return new AppProperties(
                 new AppProperties.Security(ApiKeyService.sha256Hex(ADMIN), ApiKeyService.sha256Hex(INGEST), secret, true, 8),
                 new AppProperties.Llm("", "m", "e", "http://x", 5, 30),
-                new AppProperties.Prometheus("http://localhost:9090", ""),
+                new AppProperties.Prometheus("http://localhost:9090", "", ""),
                 new AppProperties.Code("", "", "", "https://api.github.com", List.of("com.demo")),
                 new AppProperties.Knowledge("../knowledge", "./.data"),
                 new AppProperties.Limits(1440, 5, 10, 262144, 240, 10, 15, 1200));

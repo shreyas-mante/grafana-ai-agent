@@ -21,8 +21,25 @@ fi
 
 scripts/stop.sh >/dev/null 2>&1 || true
 
+PROM_CONFIG="prometheus/prometheus.yml"
+if [ -n "${GC_REMOTE_WRITE_URL:-}" ] && [ -n "${GC_USERNAME:-}" ] && [ -n "${GC_WRITE_TOKEN:-}" ]; then
+  # Forward metrics to Grafana Cloud. The token goes to a 600 file, never into the config text.
+  ( umask 077; printf '%s' "$GC_WRITE_TOKEN" > .data/gc_write_token )
+  sed "s#^  - rules.yml#  - $ROOT/prometheus/rules.yml#" prometheus/prometheus.yml > .data/prometheus.yml
+  cat >> .data/prometheus.yml <<EOF
+
+remote_write:
+  - url: $GC_REMOTE_WRITE_URL
+    basic_auth:
+      username: "$GC_USERNAME"
+      password_file: $ROOT/.data/gc_write_token
+EOF
+  PROM_CONFIG=".data/prometheus.yml"
+  echo "Forwarding metrics to Grafana Cloud"
+fi
+
 echo "Starting Prometheus on 127.0.0.1:9090"
-prometheus --config.file=prometheus/prometheus.yml --storage.tsdb.path=.data/prometheus \
+prometheus --config.file="$PROM_CONFIG" --storage.tsdb.path=.data/prometheus \
   --web.listen-address=127.0.0.1:9090 > .data/logs/prometheus.log 2>&1 &
 echo $! > .data/prometheus.pid
 

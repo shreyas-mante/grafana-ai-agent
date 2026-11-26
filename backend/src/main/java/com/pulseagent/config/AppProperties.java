@@ -23,7 +23,8 @@ public record AppProperties(Security security, Llm llm, Prometheus prometheus, C
         @Override public String toString() { return "Llm[model=" + model + ", key=" + (configured() ? "set" : "unset") + "]"; }
     }
 
-    public record Prometheus(String url, String bearerToken) {
+    /** With username set, uses basic auth (Grafana Cloud: instance ID + access token); otherwise a bearer token. */
+    public record Prometheus(String url, String bearerToken, String username) {
         @Override public String toString() { return "Prometheus[url=" + url + "]"; }
     }
 

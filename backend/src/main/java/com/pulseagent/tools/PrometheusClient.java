@@ -34,7 +34,15 @@ public class PrometheusClient {
         uriFactory.setEncodingMode(DefaultUriBuilderFactory.EncodingMode.VALUES_ONLY);
         var b = RestClient.builder().requestFactory(factory).uriBuilderFactory(uriFactory);
         String token = props.prometheus().bearerToken();
-        if (token != null && !token.isBlank()) b.defaultHeader("Authorization", "Bearer " + token);
+        String user = props.prometheus().username();
+        if (token != null && !token.isBlank()) {
+            if (user != null && !user.isBlank()) {
+                String basic = java.util.Base64.getEncoder().encodeToString((user.trim() + ":" + token.trim()).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                b.defaultHeader("Authorization", "Basic " + basic);
+            } else {
+                b.defaultHeader("Authorization", "Bearer " + token.trim());
+            }
+        }
         this.rest = b.build();
     }
 
