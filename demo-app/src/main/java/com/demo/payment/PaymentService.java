@@ -13,11 +13,11 @@ public class PaymentService {
         this.gateway = gateway;
     }
 
-    /** Authorizes with the gateway first, then holds a DB connection only for the short write. */
+    /** Runs authorization and the receipt write in one unit of work. */
     public String charge(long amountCents) {
-        String authId = gateway.authorize(amountCents);
         pool.acquire();
         try {
+            String authId = gateway.authorize(amountCents);
             saveReceipt(authId, amountCents);
             return authId;
         } finally {
