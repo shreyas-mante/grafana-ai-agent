@@ -40,7 +40,9 @@ public class DataSourceConfig {
         } else if (url.startsWith("postgres://") || url.startsWith("postgresql://")) {
             URI u = URI.create(url.replaceFirst("^postgres(ql)?://", "http://"));
             String[] userInfo = u.getRawUserInfo() == null ? new String[0] : u.getRawUserInfo().split(":", 2);
-            String query = u.getRawQuery() == null ? "sslmode=require" : u.getRawQuery();
+            // Neon adds channel_binding=require, which older JDBC drivers don't know; TLS stays enforced by sslmode.
+            String query = u.getRawQuery() == null ? "" : u.getRawQuery().replaceAll("(^|&)channel_binding=[^&]*", "").replaceAll("^&", "");
+            if (!query.contains("sslmode=")) query = query.isEmpty() ? "sslmode=require" : query + "&sslmode=require";
             cfg.setJdbcUrl("jdbc:postgresql://" + u.getHost() + (u.getPort() > 0 ? ":" + u.getPort() : "") + u.getRawPath() + "?" + query);
             if (userInfo.length > 0) cfg.setUsername(URLDecoder.decode(userInfo[0], StandardCharsets.UTF_8));
             if (userInfo.length > 1) cfg.setPassword(URLDecoder.decode(userInfo[1], StandardCharsets.UTF_8));
