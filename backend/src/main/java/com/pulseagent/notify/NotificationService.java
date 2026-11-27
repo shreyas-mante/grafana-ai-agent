@@ -44,7 +44,7 @@ public class NotificationService {
 
     private ObjectNode message(Investigation inv) {
         ObjectNode r = inv.report();
-        String link = publicUrl + "/#/inv/" + inv.id;
+        String link = publicUrl + "/#/app/inv/" + inv.id;
         String title = r != null ? r.path("title").asText(inv.question) : inv.question;
         String status = inv.status() == Investigation.Status.COMPLETED
                 ? "Confidence: " + (r == null ? "unknown" : r.path("confidence").asText("unknown")) : "Investigation failed";

@@ -1,126 +1,134 @@
-import { useEffect, useState } from 'react';
-import { api } from './api';
-import Login from './pages/Login';
-import Investigations from './pages/Investigations';
-import InvestigationView from './pages/InvestigationView';
-import Errors from './pages/Errors';
-import Knowledge from './pages/Knowledge';
-import Integrate from './pages/Integrate';
-import Settings from './pages/Settings';
-import Schedules from './pages/Schedules';
-import Actions from './pages/Actions';
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import AppShell, { signOut } from './components/AppShell';
+import { ErrorBoundary, FeedbackProvider, useFeedback } from './components/Feedback';
+import { EmptyState, LinkButton, Spinner } from './components/ui';
+import Landing from './marketing/Landing';
+import Auth from './pages/Auth';
+import { api } from './lib/api';
+import { href, match, navigate, routes, useRoute } from './lib/router';
+import type { ActionItem, Me, Meta } from './lib/types';
 
-function useHashRoute() {
-  const [hash, setHash] = useState(window.location.hash || '#/');
-  useEffect(() => {
-    const on = () => setHash(window.location.hash || '#/');
-    window.addEventListener('hashchange', on);
-    return () => window.removeEventListener('hashchange', on);
-  }, []);
-  return hash.replace(/^#/, '') || '/';
-}
+const Overview = lazy(() => import('./pages/app/Overview'));
+const Investigations = lazy(() => import('./pages/app/Investigations'));
+const InvestigationView = lazy(() => import('./pages/app/InvestigationView'));
+const Errors = lazy(() => import('./pages/app/Errors'));
+const Knowledge = lazy(() => import('./pages/app/Knowledge'));
+const Schedules = lazy(() => import('./pages/app/Schedules'));
+const Actions = lazy(() => import('./pages/app/Actions'));
+const Integrate = lazy(() => import('./pages/app/Integrate'));
+const Settings = lazy(() => import('./pages/app/Settings'));
 
-export function go(path: string) {
-  window.location.hash = path;
-}
-
-export type Me = { name: string; role: string; workspaceId: string; workspaceName: string; workspaces: { id: string; name: string; role: string }[] };
-
-const NAV = [
-  { path: '/', label: 'Investigations', icon: '⌕' },
-  { path: '/errors', label: 'Errors', icon: '⚠' },
-  { path: '/knowledge', label: 'Knowledge base', icon: '❏' },
-  { path: '/schedules', label: 'Scheduled checks', icon: '◷' },
-  { path: '/actions', label: 'Actions', icon: '✓' },
-  { path: '/integrate', label: 'Integrate', icon: '⇄' },
-  { path: '/settings', label: 'Settings', icon: '⚙', owner: true },
-];
+const INVITE_KEY = 'pa_pending_invite';
 
 export default function App() {
-  const [me, setMe] = useState<Me | null | undefined>(undefined);
-  const [meta, setMeta] = useState<any>(null);
-  const route = useHashRoute();
-  const invite = route.match(/^\/join\/([A-Za-z0-9_-]{20,100})$/)?.[1];
+  return (
+    <FeedbackProvider>
+      <Root />
+    </FeedbackProvider>
+  );
+}
 
-  const loadMe = () => api<Me>('/api/auth/me').then(setMe).catch(() => setMe(null));
+function Root() {
+  const path = useRoute();
+  const { toast } = useFeedback();
+  const [me, setMe] = useState<Me | null | undefined>(undefined);
+  const [meta, setMeta] = useState<Meta | null>(null);
+  const [pending, setPending] = useState(0);
+
+  const loadMe = useCallback(() => api<Me>('/api/auth/me').then(setMe).catch(() => setMe(null)), []);
+  const loadMeta = useCallback(() => {
+    api<Meta>('/api/meta').then(setMeta).catch(() => {});
+    api<ActionItem[]>('/api/actions').then((a) => setPending(a.filter((x) => x.status === 'PENDING').length)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     loadMe();
     const onUnauth = () => setMe(null);
     window.addEventListener('pa-unauthorized', onUnauth);
     return () => window.removeEventListener('pa-unauthorized', onUnauth);
-  }, []);
+  }, [loadMe]);
 
   useEffect(() => {
-    if (me) api('/api/meta').then(setMeta).catch(() => {});
-  }, [me, route]);
+    if (me) loadMeta();
+  }, [me, path, loadMeta]);
 
+  // Legacy links (#/inv/…) from older notifications.
+  const legacy = match(/^\/inv\/(inv_[0-9a-f]{16})$/, path);
   useEffect(() => {
-    if (me && invite) {
-      api('/api/auth/join', 'POST', { inviteToken: invite })
-        .then(() => { loadMe(); go('/'); })
-        .catch((e) => { alert(e.message); go('/'); });
-    }
+    if (legacy) navigate(routes.investigation(legacy[0]), true);
+  }, [legacy?.[0]]);
+
+  // Invite links: signed-in users join immediately; others sign up (or sign in, then join).
+  const invite = match(/^\/join\/([A-Za-z0-9_-]{20,100})$/, path)?.[0];
+  useEffect(() => {
+    if (invite) sessionStorage.setItem(INVITE_KEY, invite);
+  }, [invite]);
+  useEffect(() => {
+    const pendingInvite = sessionStorage.getItem(INVITE_KEY);
+    if (!me || !pendingInvite) return;
+    sessionStorage.removeItem(INVITE_KEY);
+    api('/api/auth/join', 'POST', { inviteToken: pendingInvite })
+      .then(() => { toast('You joined the workspace'); loadMe(); })
+      .catch((e) => toast(e.message, 'bad'))
+      .finally(() => navigate(routes.app, true));
   }, [me, invite]);
 
-  if (me === undefined) return <div className="center muted">Loading…</div>;
-  if (me === null) return <Login onDone={loadMe} invite={invite} />;
+  // Signed-in users on sign-in pages go to the app.
+  const redirectToApp = !!me && (path === routes.login || path === routes.signup);
+  useEffect(() => {
+    if (redirectToApp) navigate(routes.app, true);
+  }, [redirectToApp]);
+
+  if (me === undefined) return <div className="center-screen"><Spinner /></div>;
+
+  // Public routes
+  if (path === routes.home) return <Landing signedIn={!!me} />;
+  if (!me) {
+    if (invite) return <Auth mode="join" invite={invite} onDone={loadMe} />;
+    if (path === routes.signup) return <Auth mode="signup" onDone={loadMe} />;
+    return <Auth mode="login" onDone={loadMe} />;
+  }
+  if (redirectToApp || invite) return <div className="center-screen"><Spinner /></div>;
+  if (!path.startsWith('/app')) return <NotFound />;
 
   const isOwner = me.role === 'OWNER';
-  const invMatch = route.match(/^\/inv\/(inv_[0-9a-f]{16})$/);
+  const invId = match(/^\/app\/inv\/(inv_[0-9a-f]{16})$/, path)?.[0];
   let page;
-  if (invMatch) page = <InvestigationView id={invMatch[1]} />;
-  else if (route === '/errors') page = <Errors />;
-  else if (route === '/knowledge') page = <Knowledge />;
-  else if (route === '/schedules') page = <Schedules />;
-  else if (route === '/actions') page = <Actions isOwner={isOwner} />;
-  else if (route === '/integrate') page = <Integrate />;
-  else if (route.startsWith('/settings') && isOwner) page = <Settings me={me} onChange={() => api('/api/meta').then(setMeta)} />;
-  else page = <Investigations />;
-  const active = invMatch ? '/' : route.startsWith('/settings') ? '/settings' : route;
-
-  async function logout() {
-    await api('/api/auth/logout', 'POST').catch(() => {});
-    setMe(null);
-  }
-
-  async function switchTo(id: string) {
-    await api('/api/auth/switch', 'POST', { workspaceId: id });
-    go('/');
-    loadMe();
-  }
+  let active = path;
+  if (invId) { page = <InvestigationView id={invId} />; active = routes.investigations; }
+  else if (path === routes.app) page = <Overview me={me} meta={meta} />;
+  else if (path === routes.investigations) page = <Investigations />;
+  else if (path === routes.errors) page = <Errors />;
+  else if (path === routes.knowledge) page = <Knowledge />;
+  else if (path === routes.schedules) page = <Schedules />;
+  else if (path === routes.actions) page = <Actions isOwner={isOwner} onChange={loadMeta} />;
+  else if (path === routes.integrate) page = <Integrate />;
+  else if (path === routes.settings) page = isOwner ? <Settings me={me} onChange={loadMeta} /> : <NotFound inApp />;
+  else page = <NotFound inApp />;
 
   return (
-    <div className="shell">
-      <aside className="sidebar">
-        <div className="brand"><span className="logo">◉</span> PulseAgent</div>
-        {me.workspaces.length > 1 ? (
-          <select className="ws-select" value={me.workspaceId} onChange={(e) => switchTo(e.target.value)} aria-label="Workspace">
-            {me.workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-          </select>
-        ) : <div className="ws-name">{me.workspaceName}</div>}
-        <nav>
-          {NAV.filter((n) => !n.owner || isOwner).map((n) => (
-            <a key={n.path} href={'#' + n.path} className={active === n.path ? 'nav active' : 'nav'}>
-              <span className="nav-icon" aria-hidden="true">{n.icon}</span>{n.label}
-            </a>
-          ))}
-        </nav>
-        <div className="sidebar-foot">
-          {meta && (
-            <div className="status-list">
-              <div><span className={meta.aiMode === 'ai' ? 'dot ok' : 'dot warn'} />AI: {meta.aiMode === 'ai' ? meta.model : 'offline mode'}</div>
-              <div><span className={meta.prometheusHost ? 'dot ok' : 'dot warn'} />Metrics: {meta.prometheusHost || 'not connected'}</div>
-              <div><span className={meta.codeProvider !== 'none' ? 'dot ok' : 'dot warn'} />Code: {meta.codeProvider}</div>
-              <div><span className={meta.loki ? 'dot ok' : 'dot'} />Logs {meta.loki ? 'on' : 'off'} · <span className={meta.tempo ? 'dot ok' : 'dot'} />Traces {meta.tempo ? 'on' : 'off'}</div>
-              {meta.problems?.length > 0 && <div className="error-text small">{meta.problems[0]}</div>}
-            </div>
-          )}
-          <div className="me small muted">{me.name} · {me.role.toLowerCase()}</div>
-          <button className="ghost small" onClick={logout}>Sign out</button>
-        </div>
-      </aside>
-      <main className="main">{page}</main>
-    </div>
+    <AppShell me={me} meta={meta} active={active} pendingActions={pending}
+              onSignOut={async () => { await signOut(); setMe(null); }}
+              onSwitch={async (id) => {
+                try {
+                  await api('/api/auth/switch', 'POST', { workspaceId: id });
+                  navigate(routes.app);
+                  await loadMe();
+                  toast('Switched workspace');
+                } catch (e: any) { toast(e.message, 'bad'); }
+              }}>
+      <ErrorBoundary resetKey={path}>
+        <Suspense fallback={<div className="page"><Spinner /></div>}>{page}</Suspense>
+      </ErrorBoundary>
+    </AppShell>
   );
+}
+
+function NotFound({ inApp }: { inApp?: boolean }) {
+  const body = (
+    <EmptyState icon="globe" title="Page not found" action={<LinkButton href={href(inApp ? routes.app : routes.home)} variant="primary" icon="arrowLeft">{inApp ? 'Back to overview' : 'Back to home'}</LinkButton>}>
+      The page you’re looking for doesn’t exist or was moved.
+    </EmptyState>
+  );
+  return inApp ? <div className="page">{body}</div> : <div className="center-screen">{body}</div>;
 }

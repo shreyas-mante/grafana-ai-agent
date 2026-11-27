@@ -96,7 +96,7 @@ public class ActionService {
             body.put("title", JsonUtil.truncate(title, 250));
             body.put("body", "**Opened by PulseAgent after approval by " + approver + "**\n\n" + JsonUtil.truncate(reason, 3000)
                     + "\n\n```\n" + JsonUtil.truncate(payload.path("details").asText(""), 4000) + "\n```\n\nInvestigation: "
-                    + publicUrl + "/#/inv/" + invId);
+                    + publicUrl + "/#/app/inv/" + invId);
             JsonNode res = HttpClients.build("https://api.github.com", null, token, 20).post()
                     .uri("/repos/" + repo + "/issues").contentType(MediaType.APPLICATION_JSON).body(body).retrieve().body(JsonNode.class);
             return "Opened issue #" + (res == null ? "?" : res.path("number").asText()) + " in " + repo;
