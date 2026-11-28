@@ -189,3 +189,6 @@
 /* Founder & Contact sits right under the hero */
 .l-contact-section { padding: 56px 0 72px; background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent) 5%, transparent) 50%, transparent); }
 @media (max-width: 560px) { .l-contact-section { padding: 36px 0 52px; } }
+
+/* Section links land below the sticky nav. */
+.landing section[id] { scroll-margin-top: 64px; }
