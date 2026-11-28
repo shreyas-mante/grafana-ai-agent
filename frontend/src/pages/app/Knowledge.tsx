@@ -79,7 +79,7 @@ export default function Knowledge() {
         )}
       </Card>
 
-      <div className="grid-2" style={{ gridTemplateColumns: 'minmax(0, 1.3fr) minmax(0, 1fr)' }}>
+      <div className="grid-2 grid-wide-left">
         <Card>
           <CardHeader title="Documents" icon="book" subtitle={`${docs.data?.length ?? 0} total`}>
             <div className="segmented" role="group" aria-label="Filter documents">

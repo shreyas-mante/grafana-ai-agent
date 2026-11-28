@@ -51,7 +51,7 @@ export default function Schedules() {
     <div className="page fade-in">
       <PageHeader title="Scheduled checks" description="Recurring investigations that catch problems before users notice. Results are posted to Slack when it’s connected." />
       {error && <Alert tone="bad">{error}</Alert>}
-      <div className="grid-2" style={{ gridTemplateColumns: 'minmax(0, 1.4fr) minmax(0, 1fr)' }}>
+      <div className="grid-2 grid-wide-left">
         <Card>
           <CardHeader title="Your checks" icon="clock" />
           {loading ? <SkeletonRows /> : (data || []).length === 0 ? (

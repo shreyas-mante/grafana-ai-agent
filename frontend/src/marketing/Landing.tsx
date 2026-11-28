@@ -4,6 +4,7 @@ import { CodeBlock, LinkButton } from '../components/ui';
 import { useDocumentTitle } from '../lib/hooks';
 import { href, routes } from '../lib/router';
 import ProductPreview from './ProductPreview';
+import { useReveal } from '../lib/reveal';
 
 const FEATURES: { icon: IconName; title: string; body: string }[] = [
   { icon: 'fileCode', title: 'Exact line, author and commit', body: 'Stack traces are mapped to the file and line at the deployed commit, with git blame, the linked pull request, and the newest change near the failure.' },
@@ -75,6 +76,8 @@ export default function Landing({ signedIn }: { signedIn: boolean }) {
   const [snippet, setSnippet] = useState('Spring Boot SDK');
   const [menuOpen, setMenuOpen] = useState(false);
   const nav = [['#features', 'Features'], ['#how', 'How it works'], ['#developers', 'Developers'], ['#security', 'Security'], ['#faq', 'FAQ']];
+  useReveal('.l-section-head, .l-step, .l-feature, .l-sec-item, .l-faq-item, .l-dev-code, .l-cta-inner, .l-strip p, .l-strip ul');
+
   const go = (id: string) => (e: React.MouseEvent) => {
     e.preventDefault();
     setMenuOpen(false);
@@ -108,7 +111,7 @@ export default function Landing({ signedIn }: { signedIn: boolean }) {
           <div className="l-container l-hero-grid">
             <div className="l-hero-copy">
               <div className="l-eyebrow"><Icon name="sparkles" size={14} />AI incident investigator for Prometheus and Grafana</div>
-              <h1>Find the line of code behind every incident.</h1>
+              <h1>Find the line of code behind <span className="grad-text">every incident.</span></h1>
               <p className="l-lead">PulseAgent investigates alerts and failing APIs like a senior SRE: it reads your metrics, logs, traces, code and runbooks, then shows the exact commit that caused it and how to fix it.</p>
               <div className="row-wrap l-hero-cta">
                 <LinkButton href={href(signedIn ? routes.app : routes.signup)} variant="primary" size="lg" iconRight="arrowRight">{signedIn ? 'Open your workspace' : 'Get started free'}</LinkButton>

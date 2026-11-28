@@ -111,7 +111,7 @@ function Integrations({ onChange }: { onChange: () => void }) {
               <div style={{ flex: 1, minWidth: 0 }}><h3>{g.title}</h3><div className="muted small">{g.help}</div></div>
               {configured ? <Badge tone="ok" icon="check">Connected</Badge> : <Badge tone="neutral">Not set</Badge>}
             </div>
-            <div className="card-body form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+            <div className="card-body form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))' }}>
               {fields.filter((d) => !(d.name === 'llm.baseUrl' && provider !== 'openai')).map((d) => CHOICES[d.name] ? (
                 <Select key={d.name} label={d.label} value={value(d) || CHOICES[d.name][0].value} options={CHOICES[d.name]}
                         onChange={(e) => setEdits({ ...edits, [d.name]: e.target.value })} />
@@ -239,7 +239,7 @@ function Keys() {
       )}
       <Card as="form" onSubmit={create} noValidate>
         <CardHeader title="Create a key" icon="plus" />
-        <div className="card-body form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+        <div className="card-body form-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(220px, 100%), 1fr))' }}>
           <TextInput label="Name" value={name} maxLength={100} placeholder="payment-service production" error={errors.name} onChange={(e) => { setName(e.target.value); setErrors({}); }} />
           <Select label="Scope" value={scope} onChange={(e) => { setScope(e.target.value); setErrors({}); }}
                   options={Object.entries(SCOPES).map(([v, l]) => ({ value: v, label: `${v}: ${l}` }))} />
