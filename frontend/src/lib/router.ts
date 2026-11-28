@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 /** Minimal hash router: the server serves one page, so deep links never hit the backend. */
 export function currentPath(): string {
   const h = window.location.hash.replace(/^#/, '');
-  return h === '' ? '/' : h.startsWith('/') ? h : '/' + h;
+  // "#contact" style anchors are sections of the home page, not app routes.
+  return h.startsWith('/') ? h : '/';
 }
 
 export function useRoute(): string {
@@ -11,7 +12,7 @@ export function useRoute(): string {
   useEffect(() => {
     const on = () => {
       setPath(currentPath());
-      window.scrollTo({ top: 0 });
+      if (window.location.hash.startsWith('#/')) window.scrollTo({ top: 0 });
     };
     window.addEventListener('hashchange', on);
     return () => window.removeEventListener('hashchange', on);

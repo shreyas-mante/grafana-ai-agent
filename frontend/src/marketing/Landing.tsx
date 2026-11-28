@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Icon, type IconName } from '../components/Icon';
 import { CodeBlock, LinkButton } from '../components/ui';
 import { useDocumentTitle } from '../lib/hooks';
@@ -77,6 +77,18 @@ export default function Landing({ signedIn }: { signedIn: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const nav = [['#features', 'Features'], ['#how', 'How it works'], ['#developers', 'Developers'], ['#security', 'Security'], ['#faq', 'FAQ'], ['#contact', 'Contact']];
   useReveal('.l-section-head, .l-step, .l-feature, .l-sec-item, .l-faq-item, .l-dev-code, .l-contact-card, .l-cta-inner, .l-strip p, .l-strip ul');
+
+  // Deep links such as /#contact scroll to that section.
+  useEffect(() => {
+    const toSection = () => {
+      const id = window.location.hash.slice(1);
+      if (!/^[a-z-]+$/.test(id)) return;
+      window.setTimeout(() => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' }), 60);
+    };
+    toSection();
+    window.addEventListener('hashchange', toSection);
+    return () => window.removeEventListener('hashchange', toSection);
+  }, []);
 
   const go = (id: string) => (e: React.MouseEvent) => {
     e.preventDefault();
