@@ -12,8 +12,12 @@ export function useReveal(selector: string) {
     const io = new IntersectionObserver((entries) => {
       for (const e of entries) {
         if (e.isIntersecting) {
-          e.target.classList.add('in');
-          io.unobserve(e.target);
+          const el = e.target as HTMLElement;
+          el.classList.add('in');
+          io.unobserve(el);
+          // Hand the element back to its own hover transitions once it has appeared.
+          const delay = 750 + Number(el.style.getPropertyValue('--i') || 0) * 70;
+          window.setTimeout(() => el.classList.remove('reveal', 'in'), delay);
         }
       }
     }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });

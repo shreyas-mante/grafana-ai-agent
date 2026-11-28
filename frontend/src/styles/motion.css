@@ -44,8 +44,8 @@
 .preview-steps span:nth-child(5) { animation-delay: 1.7s; }
 
 /* ---------- Landing: scroll reveal (classes added by useReveal) ---------- */
-.reveal { opacity: 0; transform: translateY(22px); transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out); transition-delay: calc(var(--i, 0) * 70ms); }
-.reveal.in { opacity: 1; transform: none; }
+.landing .reveal { opacity: 0; transform: translateY(22px); transition: opacity 0.7s var(--ease-out), transform 0.7s var(--ease-out); transition-delay: calc(var(--i, 0) * 70ms); }
+.landing .reveal.in { opacity: 1; transform: none; }
 
 /* Hover lift on landing cards */
 .l-step, .l-sec-item, .l-strip li { transition: transform 0.35s var(--ease-out), box-shadow 0.35s var(--ease-out), border-color 0.2s; }
@@ -117,3 +117,6 @@ a.card:hover, .card.hoverable:hover, .grid-4 > .card:hover { transform: translat
   .btn:not(:disabled):hover, .l-step:hover, .l-sec-item:hover, .nav-item:hover, .chip:hover, .l-strip li:hover { transform: none; }
   .list-row:hover { padding-left: 20px; }
 }
+.l-contact-card { transition: transform 0.4s var(--ease-out), box-shadow 0.4s var(--ease-out); }
+.l-contact-card:hover { transform: translateY(-4px); }
+.l-contact-avatar { animation: float 5s ease-in-out infinite; }

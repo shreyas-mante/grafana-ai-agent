@@ -75,8 +75,8 @@ export default function Landing({ signedIn }: { signedIn: boolean }) {
   useDocumentTitle('');
   const [snippet, setSnippet] = useState('Spring Boot SDK');
   const [menuOpen, setMenuOpen] = useState(false);
-  const nav = [['#features', 'Features'], ['#how', 'How it works'], ['#developers', 'Developers'], ['#security', 'Security'], ['#faq', 'FAQ']];
-  useReveal('.l-section-head, .l-step, .l-feature, .l-sec-item, .l-faq-item, .l-dev-code, .l-cta-inner, .l-strip p, .l-strip ul');
+  const nav = [['#features', 'Features'], ['#how', 'How it works'], ['#developers', 'Developers'], ['#security', 'Security'], ['#faq', 'FAQ'], ['#contact', 'Contact']];
+  useReveal('.l-section-head, .l-step, .l-feature, .l-sec-item, .l-faq-item, .l-dev-code, .l-contact-card, .l-cta-inner, .l-strip p, .l-strip ul');
 
   const go = (id: string) => (e: React.MouseEvent) => {
     e.preventDefault();
@@ -231,6 +231,33 @@ export default function Landing({ signedIn }: { signedIn: boolean }) {
           </div>
         </section>
 
+        <section id="contact" className="l-section l-alt">
+          <div className="l-container l-contact">
+            <div className="l-section-head left">
+              <span className="l-kicker">Contact</span>
+              <h2>Talk to the team behind PulseAgent</h2>
+              <p>Questions, feedback, partnership or enterprise setup: write in and you will hear back directly from the person who builds it.</p>
+            </div>
+            <div className="l-contact-card">
+              <div className="l-contact-person">
+                <div className="l-contact-avatar" aria-hidden="true">SM</div>
+                <div>
+                  <h3>Shreyas Mante</h3>
+                  <p>Founder &amp; Lead Developer</p>
+                </div>
+              </div>
+              <ul className="l-contact-roles">
+                <li><Icon name="sparkles" size={15} />Product, architecture and roadmap</li>
+                <li><Icon name="fileCode" size={15} />Engineering, integrations and security</li>
+                <li><Icon name="users" size={15} />Support, onboarding and partnerships</li>
+              </ul>
+              <a className="btn btn-primary btn-lg l-contact-mail" href="mailto:shreyas.mante@gmail.com?subject=PulseAgent">
+                <Icon name="mail" />shreyas.mante@gmail.com
+              </a>
+            </div>
+          </div>
+        </section>
+
         <section className="l-cta">
           <div className="l-container l-cta-inner">
             <h2>Spend the next incident fixing, not searching.</h2>
@@ -252,11 +279,12 @@ export default function Landing({ signedIn }: { signedIn: boolean }) {
           <nav className="l-footer-links" aria-label="Footer">
             <div><h4>Product</h4><a href="#features" onClick={go('#features')}>Features</a><a href="#how" onClick={go('#how')}>How it works</a><a href="#security" onClick={go('#security')}>Security</a></div>
             <div><h4>Developers</h4><a href="#developers" onClick={go('#developers')}>Integrations</a><a href="#faq" onClick={go('#faq')}>FAQ</a></div>
+            <div><h4>Company</h4><a href="#contact" onClick={go('#contact')}>Contact</a><a href="mailto:shreyas.mante@gmail.com?subject=PulseAgent">Email us</a></div>
             <div><h4>Account</h4><a href={href(routes.login)}>Sign in</a><a href={href(routes.signup)}>Create account</a></div>
           </nav>
         </div>
         <div className="l-container l-footer-bottom muted small">
-          <span>© {new Date().getFullYear()} PulseAgent</span>
+          <span>© {new Date().getFullYear()} PulseAgent · Built by Shreyas Mante</span>
           <span>Grafana, Prometheus, Loki and Tempo are trademarks of their respective owners. PulseAgent is not affiliated with Grafana Labs.</span>
         </div>
       </footer>

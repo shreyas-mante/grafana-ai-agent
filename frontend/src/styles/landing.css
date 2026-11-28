@@ -164,3 +164,20 @@
   .l-footer-links { gap: 32px; }
   .l-dev-code .code-block pre { font-size: 12px; min-height: 0; }
 }
+
+/* Contact */
+.l-contact { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; align-items: center; }
+.l-contact .l-section-head p { margin-top: 4px; }
+.l-contact-card { position: relative; padding: 28px; border-radius: 20px; border: 1px solid var(--border); background: var(--bg); box-shadow: var(--shadow-lg); overflow: hidden; }
+.l-contact-card::before { content: ""; position: absolute; inset: 0 0 auto; height: 4px; background: linear-gradient(90deg, var(--accent), var(--accent-2), #ec4899); }
+.l-contact-person { display: flex; align-items: center; gap: 16px; }
+.l-contact-avatar { width: 60px; height: 60px; border-radius: 18px; display: grid; place-items: center; flex: none; font-weight: 700; font-size: 20px; color: #fff; letter-spacing: 0.02em;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)); box-shadow: 0 10px 24px -10px color-mix(in srgb, var(--accent) 70%, transparent); }
+.l-contact-person h3 { font-size: 19px; letter-spacing: -0.015em; }
+.l-contact-person p { color: var(--accent-text); font-weight: 600; font-size: 14px; margin-top: 2px; }
+.l-contact-roles { list-style: none; padding: 0; margin: 22px 0; display: flex; flex-direction: column; gap: 10px; }
+.l-contact-roles li { display: flex; align-items: center; gap: 10px; color: var(--text-2); font-size: 14.5px; }
+.l-contact-roles svg { color: var(--accent-text); flex: none; }
+.l-contact-mail { width: 100%; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 880px) { .l-contact { grid-template-columns: minmax(0, 1fr); gap: 24px; } }
+@media (max-width: 560px) { .l-contact-card { padding: 22px 18px; } .l-contact-mail { font-size: 14px; } }
