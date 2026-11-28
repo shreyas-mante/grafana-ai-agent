@@ -73,7 +73,7 @@ app:
     session-hours: 8
   llm:
     api-key: ${GEMINI_API_KEY:}
-    model: ${APP_LLM_MODEL:gemini-2.5-flash}
+    model: ${APP_LLM_MODEL:gemini-flash-latest}
     embedding-model: ${APP_EMBEDDING_MODEL:gemini-embedding-001}
     base-url: ${APP_LLM_BASE_URL:https://generativelanguage.googleapis.com/v1beta}
     max-steps: 10

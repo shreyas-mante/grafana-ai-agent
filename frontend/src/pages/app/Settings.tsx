@@ -26,7 +26,7 @@ const CHOICES: Record<string, { value: string; label: string }[]> = {
   'llm.provider': [{ value: 'none', label: 'None (offline mode)' }, { value: 'gemini', label: 'Google Gemini' }, { value: 'anthropic', label: 'Anthropic Claude' }, { value: 'openai', label: 'OpenAI-compatible (OpenAI, Groq, Ollama…)' }],
   'notify.on': [{ value: 'alerts', label: 'Automatic investigations only' }, { value: 'all', label: 'All investigations' }, { value: 'none', label: 'Nothing' }],
 };
-const MODEL_HINT: Record<string, string> = { gemini: 'gemini-2.5-flash', anthropic: 'claude-opus-5-5', openai: 'gpt-4o-mini, or llama-3.3-70b-versatile on Groq', none: '' };
+const MODEL_HINT: Record<string, string> = { gemini: 'gemini-flash-latest', anthropic: 'claude-opus-5-5', openai: 'gpt-4o-mini, or llama-3.3-70b-versatile on Groq', none: '' };
 
 export default function Settings({ me, onChange }: { me: Me; onChange: () => void }) {
   useDocumentTitle('Settings');
@@ -89,7 +89,7 @@ function Integrations({ onChange }: { onChange: () => void }) {
   }
 
   async function test(group: string, integration: string) {
-    setBusy(group);
+    setBusy('test:' + group);
     try {
       const r = await api(`/api/admin/settings/test/${integration}`, 'POST');
       setStatus((s) => ({ ...s, [group]: { ok: r.ok, text: r.detail } }));
@@ -134,8 +134,8 @@ function Integrations({ onChange }: { onChange: () => void }) {
             <div className="card-footer row-wrap">
               {st && <span className="row small" style={{ color: st.ok ? 'var(--ok)' : 'var(--bad)', flex: 1, minWidth: 200 }}><Icon name={st.ok ? 'checkCircle' : 'xCircle'} size={15} />{st.text}</span>}
               <span className="spacer" />
-              {g.test && <Button size="sm" icon="zap" disabled={busy === g.id || dirty(g.id)} title={dirty(g.id) ? 'Save first' : undefined} onClick={() => test(g.id, g.test!)}>Test connection</Button>}
-              <Button size="sm" type="submit" variant="primary" loading={busy === g.id} disabled={!dirty(g.id)}>Save</Button>
+              {g.test && <Button size="sm" icon="zap" loading={busy === 'test:' + g.id} disabled={busy !== '' || dirty(g.id)} title={dirty(g.id) ? 'Save first' : undefined} onClick={() => test(g.id, g.test!)}>Test connection</Button>}
+              <Button size="sm" type="submit" variant="primary" loading={busy === g.id} disabled={!dirty(g.id) || busy !== ''}>Save</Button>
             </div>
           </Card>
         );

@@ -6,16 +6,16 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.pulseagent.config.JsonUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.MediaType;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientResponseException;
-
+import java.net.URI;
 import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Gemini REST provider (function calling + embeddings). The API key is sent only in the
@@ -25,18 +25,22 @@ public class GeminiClient implements Llm.Provider {
 
     private static final Logger log = LoggerFactory.getLogger(GeminiClient.class);
     private static final String BASE = "https://generativelanguage.googleapis.com/v1beta";
+    public static final String DEFAULT_MODEL = "gemini-flash-latest";
     private final String apiKey;
     private final String model;
     private final String embeddingModel;
-    private final RestClient rest;
+    private static final Duration CALL_TIMEOUT = Duration.ofSeconds(90);
+    /** HTTP/1.1 with fixed-length bodies: streamed bodies over HTTP/2 could stall until the deadline. */
+    private static final HttpClient HTTP = HttpClient.newBuilder()
+            .version(HttpClient.Version.HTTP_1_1)
+            .connectTimeout(Duration.ofSeconds(10))
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build();
 
     public GeminiClient(String apiKey, String model, String embeddingModel) {
         this.apiKey = apiKey;
-        this.model = model == null || model.isBlank() ? "gemini-2.5-flash" : model;
+        this.model = model == null || model.isBlank() ? DEFAULT_MODEL : model.trim();
         this.embeddingModel = embeddingModel == null || embeddingModel.isBlank() ? "gemini-embedding-001" : embeddingModel;
-        var factory = new JdkClientHttpRequestFactory(HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build());
-        factory.setReadTimeout(Duration.ofSeconds(120));
-        this.rest = RestClient.builder().requestFactory(factory).baseUrl(BASE).build();
     }
 
     @Override public String name() { return "gemini"; }
@@ -140,35 +144,61 @@ public class GeminiClient implements Llm.Provider {
     }
 
     private JsonNode post(String path, ObjectNode body) {
+        byte[] payload = JsonUtil.write(body).getBytes(StandardCharsets.UTF_8);
+        HttpRequest req = HttpRequest.newBuilder(URI.create(BASE + path))
+                .timeout(CALL_TIMEOUT)
+                .header("x-goog-api-key", apiKey)
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofByteArray(payload))
+                .build();
         int attempts = 0;
         while (true) {
             attempts++;
+            long t0 = System.nanoTime();
+            int status;
+            String text;
             try {
-                return rest.post().uri(path)
-                        .header("x-goog-api-key", apiKey)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .body(body)
-                        .retrieve()
-                        .body(JsonNode.class);
-            } catch (RestClientResponseException e) {
-                int status = e.getStatusCode().value();
-                if ((status == 429 || status >= 500) && attempts < 4) {
-                    sleep(1500L * attempts * attempts);
-                    continue;
-                }
-                log.warn("Gemini call failed with HTTP {}", status);
-                throw new LlmException(status == 429
-                        ? "The AI provider's rate limit was hit. Wait a minute and try again."
-                        : status == 400 || status == 403 ? "The AI provider rejected the request (HTTP " + status + "). Check the API key and model name."
-                        : "The AI provider returned HTTP " + status);
+                // Hard deadline on the whole exchange, response body included.
+                HttpResponse<String> res = HTTP.sendAsync(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+                        .get(CALL_TIMEOUT.toSeconds() + 5, TimeUnit.SECONDS);
+                status = res.statusCode();
+                text = res.body();
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                throw new LlmException("interrupted");
             } catch (Exception e) {
-                if (attempts < 3) {
-                    sleep(1000L * attempts);
+                log.warn("Gemini call attempt {} failed after {} ms: {}", attempts, elapsedMs(t0), e.getClass().getSimpleName());
+                if (attempts < 2) {
+                    sleep(1000L);
                     continue;
                 }
-                throw new LlmException("Could not reach the AI provider");
+                throw new LlmException("Could not reach the AI provider (timed out or connection failed)");
             }
+            if (status >= 200 && status < 300) {
+                try {
+                    return JsonUtil.M.readTree(text);
+                } catch (Exception e) {
+                    throw new LlmException("The AI provider returned an unreadable response");
+                }
+            }
+            if ((status == 429 || status >= 500) && attempts < 3) {
+                log.warn("Gemini call attempt {} returned HTTP {} after {} ms, retrying", attempts, status, elapsedMs(t0));
+                sleep(2000L * attempts);
+                continue;
+            }
+            log.warn("Gemini call failed with HTTP {} after {} ms", status, elapsedMs(t0));
+            throw new LlmException(switch (status) {
+                case 429 -> "The AI provider's rate limit or free quota was hit. Wait a minute and try again.";
+                case 400, 401, 403 -> "The AI provider rejected the request (HTTP " + status + "). Check the API key and model name.";
+                case 404 -> "The model was not found (HTTP 404). Try " + DEFAULT_MODEL + ".";
+                default -> "The AI provider returned HTTP " + status;
+            });
         }
+    }
+
+    private static long elapsedMs(long t0) {
+        return (System.nanoTime() - t0) / 1_000_000;
     }
 
     static void sleep(long ms) {
