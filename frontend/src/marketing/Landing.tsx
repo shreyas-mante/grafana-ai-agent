@@ -115,6 +115,7 @@ export default function Landing({ signedIn }: { signedIn: boolean }) {
             <Icon name={menuOpen ? 'x' : 'menu'} />
           </button>
         </div>
+        {menuOpen && <div className="l-scrim" aria-hidden="true" onClick={() => setMenuOpen(false)} />}
       </header>
 
       <main id="main">
@@ -138,6 +139,33 @@ export default function Landing({ signedIn }: { signedIn: boolean }) {
             <div className="l-hero-visual">
               <ProductPreview />
               <p className="l-caption">Example investigation with sample data</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="contact" className="l-section l-contact-section">
+          <div className="l-container l-contact">
+            <div className="l-section-head left">
+              <span className="l-kicker">Contact</span>
+              <h2>Talk to the team behind PulseAgent</h2>
+              <p>Questions, feedback, partnership or enterprise setup: write in and you will hear back directly from the person who builds it.</p>
+            </div>
+            <div className="l-contact-card">
+              <div className="l-contact-person">
+                <div className="l-contact-avatar" aria-hidden="true">SM</div>
+                <div>
+                  <h3>Shreyas Mante</h3>
+                  <p>Founder &amp; Lead Developer</p>
+                </div>
+              </div>
+              <ul className="l-contact-roles">
+                <li><Icon name="sparkles" size={15} />Product, architecture and roadmap</li>
+                <li><Icon name="fileCode" size={15} />Engineering, integrations and security</li>
+                <li><Icon name="users" size={15} />Support, onboarding and partnerships</li>
+              </ul>
+              <a className="btn btn-primary btn-lg l-contact-mail" href="mailto:shreyas.mante@gmail.com?subject=PulseAgent">
+                <Icon name="mail" />shreyas.mante@gmail.com
+              </a>
             </div>
           </div>
         </section>
@@ -239,33 +267,6 @@ export default function Landing({ signedIn }: { signedIn: boolean }) {
                   <p>{f.a}</p>
                 </details>
               ))}
-            </div>
-          </div>
-        </section>
-
-        <section id="contact" className="l-section l-alt">
-          <div className="l-container l-contact">
-            <div className="l-section-head left">
-              <span className="l-kicker">Contact</span>
-              <h2>Talk to the team behind PulseAgent</h2>
-              <p>Questions, feedback, partnership or enterprise setup: write in and you will hear back directly from the person who builds it.</p>
-            </div>
-            <div className="l-contact-card">
-              <div className="l-contact-person">
-                <div className="l-contact-avatar" aria-hidden="true">SM</div>
-                <div>
-                  <h3>Shreyas Mante</h3>
-                  <p>Founder &amp; Lead Developer</p>
-                </div>
-              </div>
-              <ul className="l-contact-roles">
-                <li><Icon name="sparkles" size={15} />Product, architecture and roadmap</li>
-                <li><Icon name="fileCode" size={15} />Engineering, integrations and security</li>
-                <li><Icon name="users" size={15} />Support, onboarding and partnerships</li>
-              </ul>
-              <a className="btn btn-primary btn-lg l-contact-mail" href="mailto:shreyas.mante@gmail.com?subject=PulseAgent">
-                <Icon name="mail" />shreyas.mante@gmail.com
-              </a>
             </div>
           </div>
         </section>
